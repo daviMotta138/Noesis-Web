@@ -57,6 +57,8 @@
     color: var(--color-text);
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   input,
