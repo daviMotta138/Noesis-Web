@@ -1,4 +1,4 @@
-package com.catarse.noesis;
+package com.noesis.app;
 
 import com.getcapacitor.BridgeActivity;
 

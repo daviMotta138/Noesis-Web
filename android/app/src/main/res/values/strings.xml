@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Noesis</string>
     <string name="title_activity_main">Noesis</string>
-    <string name="package_name">com.catarse.noesis</string>
-    <string name="custom_url_scheme">com.catarse.noesis</string>
+    <string name="package_name">com.noesis.app</string>
+    <string name="custom_url_scheme">com.noesis.app</string>
 </resources>
