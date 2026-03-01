@@ -2,28 +2,28 @@
 import { useState, useEffect } from 'react';
 import { X, Sparkles, Trophy, Shield, Bell } from 'lucide-react';
 
-const VERSION_KEY = 'changelog_v4.0';
+const VERSION_KEY = 'changelog_v5.1';
 
 const ENTRIES = [
     {
         Icon: Sparkles,
-        title: 'Perfil Minimalista',
-        desc: 'Seu perfil agora está mais limpo, destacando suas estatísticas vitais e emblemas.',
-    },
-    {
-        Icon: Bell,
-        title: 'Rádio Noesis',
-        desc: 'Nova rádio dinâmica! O Admin agora pode gerenciar a trilha sonora do app em tempo real.',
-    },
-    {
-        Icon: Shield,
-        title: 'Estabilidade Musical',
-        desc: 'O motor de áudio foi totalmente reescrito para nunca mais travar o Player.',
+        title: 'Acesso com Google',
+        desc: 'Entre no Noesis com apenas um clique usando sua conta Google. Mais rápido e seguro.',
     },
     {
         Icon: Trophy,
-        title: 'Divisões e Ligas',
-        desc: 'Suba no ranking da comunidade coletando pontos em suas sessões diárias.',
+        title: 'Ligas Competitivas',
+        desc: 'O Ranking agora tem divisões! Lute para subir de liga e ganhar recompensas exclusivas.',
+    },
+    {
+        Icon: Bell,
+        title: 'Alertas em Tempo Real',
+        desc: 'Receba notificações instantâneas de novas mensagens de amigos e presentes recebidos.',
+    },
+    {
+        Icon: Shield,
+        title: 'Área Playground',
+        desc: 'Explore a nova seção "Outros Modos" e descubra novas formas de treinar sua memória.',
     },
 ];
 
@@ -66,7 +66,7 @@ export const ChangelogModal = () => {
                         <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--color-gold-dim)' }}>
                             Atualização
                         </p>
-                        <h2 className="text-2xl font-black text-display text-gradient-gold">Versão 4.0</h2>
+                        <h2 className="text-2xl font-black text-display text-gradient-gold">Versão 5.1</h2>
                     </div>
                     <button
                         onClick={handleClose}
