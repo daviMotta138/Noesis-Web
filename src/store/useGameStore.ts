@@ -149,7 +149,7 @@ export const useGameStore = create<GameState>()(
                 }
             },
 
-            submitRecall: async (answers, score, nousEarned) => {
+            submitRecall: async (answers, score) => {
                 const { session, user, profile } = get();
                 if (!session || !user) return;
 

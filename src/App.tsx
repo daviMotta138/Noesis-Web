@@ -17,7 +17,7 @@ import NotificationsPage from './pages/Notifications';
 import SettingsPage from './pages/Settings';
 import Layout from './components/Layout';
 import PlaygroundPage from './pages/Playground';
-import { ChangelogModal } from './components/changelogModal';
+import { ChangelogModal } from './components/ChangelogModal';
 
 function AnimatedRoutes() {
   const location = useLocation();

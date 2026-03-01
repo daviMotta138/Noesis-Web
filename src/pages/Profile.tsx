@@ -24,8 +24,6 @@ const DEFAULT_AVATAR: AvatarConfig = {
 
 export default function ProfilePage() {
     const { profile, user, updateProfile, setUser, setProfile, fetchProfile } = useGameStore();
-    const [friendSearch, setFriendSearch] = useState('');
-    const [searchResult, setSearchResult] = useState<string | null>(null);
     const [friendsCount, setFriendsCount] = useState(0);
     const [copied, setCopied] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -52,12 +50,6 @@ export default function ProfilePage() {
         }
     };
 
-    const searchFriend = async () => {
-        if (!friendSearch.trim()) return;
-        const { data } = await supabase.from('profiles')
-            .select('display_name').eq('friend_id', friendSearch.trim()).single();
-        setSearchResult(data ? `✓ ${data.display_name}` : '✗ Não encontrado');
-    };
 
     // Fetch accepted friends count
 
