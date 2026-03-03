@@ -48,6 +48,8 @@ interface MatchState {
   startMatch: (matchId: string) => Promise<void>;
   reportPair: (matchId: string, playerId: string, idx1: number, idx2: number) => Promise<any>;
   getMatchState: (matchId: string, playerId: string) => Promise<void>;
+  enqueueQueue: (userId: string, displayName: string) => Promise<any>;
+  leaveQueue: (userId: string) => Promise<void>;
   subscribeToMatch: (matchId: string, playerId: string) => () => void;
   reset: () => void;
 }
@@ -150,6 +152,31 @@ export const useMatchStore = create<MatchState>((set) => ({
     }
   },
 
+  enqueueQueue: async (userId: string, displayName: string) => {
+    set({ loading: true, error: null });
+    try {
+      const { data, error } = await supabase.rpc('enqueue_player', {
+        p_user_id: userId,
+        p_display_name: displayName
+      });
+      if (error) throw error;
+      return data as any;
+    } catch (e: any) {
+      set({ error: e.message });
+      throw e;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  leaveQueue: async (userId: string) => {
+    try {
+      const { error } = await supabase.rpc('leave_queue', { p_user_id: userId });
+      if (error) throw error;
+    } catch (e: any) {
+      set({ error: e.message });
+      throw e;
+    }
+  },
   subscribeToMatch: (matchId, playerId) => {
     // Subscribe to Realtime changes on br_matches, br_players, br_cards, br_events
     const matchSubscription = supabase

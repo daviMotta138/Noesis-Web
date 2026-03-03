@@ -68,12 +68,32 @@ create table if not exists br_invites (
   created_at timestamptz not null default now()
 );
 
+-- Matchmaking queue: users waiting for automatic match creation
+create table if not exists br_queue (
+  user_id uuid primary key,
+  display_name text,
+  joined_at timestamptz not null default now()
+);
+
 -- Simple policies: authenticated users can read BR data
 -- (RPCs handle authorization internally with security definer)
+-- drop older policies to avoid recursion issues
 alter table br_matches enable row level security;
 alter table br_players enable row level security;
 alter table br_cards enable row level security;
 alter table br_events enable row level security;
+alter table br_queue enable row level security; -- allow RLS on queue
+
+-- ensure old policies are removed
+drop policy if exists "public_select_matches" on br_matches;
+drop policy if exists "players_select_if_participant" on br_players;
+drop policy if exists "cards_select_if_participant" on br_cards;
+drop policy if exists "events_select_if_participant" on br_events;
+
+drop policy if exists "matches_select_authenticated" on br_matches;
+drop policy if exists "players_select_authenticated" on br_players;
+drop policy if exists "cards_select_authenticated" on br_cards;
+drop policy if exists "events_select_authenticated" on br_events;
 
 create policy "matches_select_authenticated" on br_matches for select using (auth.role() = 'authenticated');
 
@@ -82,6 +102,8 @@ create policy "players_select_authenticated" on br_players for select using (aut
 create policy "cards_select_authenticated" on br_cards for select using (auth.role() = 'authenticated');
 
 create policy "events_select_authenticated" on br_events for select using (auth.role() = 'authenticated');
+
+create policy "queue_select_authenticated" on br_queue for select using (auth.role() = 'authenticated');
 
 -- RPCs / Functions
 
@@ -166,6 +188,57 @@ $$;
 grant execute on function start_br_match(uuid) to authenticated, service_role;
 
 -- helper: advance_turn(match_id) - moves current_player to next active player
+
+-- matchmaking helpers
+
+-- enqueue_player(user, display_name) -> returns {match_id, queue_count, needed}
+create or replace function enqueue_player(p_user_id uuid, p_display_name text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_match uuid;
+  v_count int;
+  v_needed int;
+begin
+  -- ensure user not already queued
+  delete from br_queue where user_id = p_user_id;
+  insert into br_queue(user_id, display_name) values (p_user_id, p_display_name);
+  select count(*) into v_count from br_queue;
+
+  -- default threshold (minimum 2 to start, or 4?) using 4
+  v_needed := 4 - v_count;
+  if v_needed <= 0 then
+    -- create new match with default grid 4x6, max_players 8
+    v_match := create_br_match(p_user_id, 8, 4, 6);
+    -- join up to 8 players from queue
+    for rec in select * from br_queue order by joined_at limit 8 loop
+      perform join_br_match(v_match, rec.user_id, rec.display_name, false);
+    end loop;
+    delete from br_queue where user_id in (select user_id from br_queue order by joined_at limit 8);
+    return jsonb_build_object('match_id', v_match, 'queue_count', 0, 'needed', 0);
+  end if;
+  return jsonb_build_object('match_id', null, 'queue_count', v_count, 'needed', v_needed);
+end;
+$$;
+
+grant execute on function enqueue_player(uuid, text) to authenticated, service_role;
+
+-- remove user from queue
+create or replace function leave_queue(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from br_queue where user_id = p_user_id;
+end;
+$$;
+
+grant execute on function leave_queue(uuid) to authenticated, service_role;
 create or replace function advance_turn(p_match_id uuid)
 returns uuid
 language plpgsql
