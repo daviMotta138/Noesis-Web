@@ -5,10 +5,7 @@ import { supabase } from './lib/supabase';
 import { useGameStore } from './store/useGameStore';
 import { StarBackground } from './components/StarBackground';
 import AuthPage from './pages/Auth';
-import HomePage from './pages/Home';
-import RankingPage from './pages/Ranking';
 import ShopPage from './pages/Shop';
-import ProfilePage from './pages/Profile';
 import FriendsPage from './pages/Friends';
 import NousStorePage from './pages/NousStore';
 import StreakPage from './pages/StreakPage';
@@ -26,11 +23,12 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route element={<Layout />}>
-          <Route path="/" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><HomePage /></motion.div>} />
-          <Route path="/ranking" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RankingPage /></motion.div>} />
+          {/* Canvas routes: URL matching only. SwipeNavigator in Layout renders the actual pages. */}
+          <Route path="/" element={null} />
+          <Route path="/ranking" element={null} />
+          <Route path="/profile" element={null} />
           <Route path="/friends" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><FriendsPage /></motion.div>} />
           <Route path="/shop" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ShopPage /></motion.div>} />
-          <Route path="/profile" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ProfilePage /></motion.div>} />
           <Route path="/nous" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><NousStorePage /></motion.div>} />
           <Route path="/streak" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><StreakPage /></motion.div>} />
           <Route path="/admin" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><AdminPage /></motion.div>} />

@@ -1,6 +1,6 @@
 // src/components/Layout.tsx — Desktop sidebar with notification bell
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { Home, Trophy, Users, ShoppingBag, User, ShieldAlert, LogOut, Bell, Menu, X, Settings, Gamepad2 } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
@@ -13,12 +13,7 @@ import { GiftClaimOverlay } from './GiftClaimOverlay';
 import { MusicPlayer, MusicPlayerUI } from './MusicPlayer';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
-import SwipeNavigator from './SwipeNavigator';
-
-// Lazy-load heavy screens rendered inside the swipe canvas
-const HomePage = lazy(() => import('../pages/Home'));
-const RankingPage = lazy(() => import('../pages/Ranking'));
-const ProfilePage = lazy(() => import('../pages/Profile'));
+import { SwipeNavigator } from './SwipeNavigator';
 
 const BASE_NAV = [
     { to: '/', icon: Home, label: 'Início', adminOnly: false },
@@ -39,24 +34,10 @@ export default function Layout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [chatToast, setChatToast] = useState<any | null>(null);
 
-    // Swipe navigator: derive current screen index from the URL
-    const SWIPE_PATHS = ['/', '/ranking', '/profile'];
-    const currentSwipeIndex = SWIPE_PATHS.indexOf(location.pathname) !== -1
-        ? SWIPE_PATHS.indexOf(location.pathname)
-        : -1; // -1 means we're on a non-swipeable route
-
-    const swipeScreens = [
-        { path: '/', el: <Suspense fallback={null}><HomePage /></Suspense> },
-        { path: '/ranking', el: <Suspense fallback={null}><RankingPage /></Suspense> },
-        { path: '/profile', el: <Suspense fallback={null}><ProfilePage /></Suspense> },
-    ];
-
-    const handleSwipeNavigate = (index: number) => {
-        navigate(SWIPE_PATHS[index]);
-    };
-
-    // Determine if the mobile layout should use the swipe canvas
-    const isSwipeRoute = currentSwipeIndex !== -1;
+    // Canvas tabs — these stay mounted and use SwipeNavigator
+    const CANVAS_PATHS = ['/', '/ranking', '/profile'];
+    const canvasIndex = CANVAS_PATHS.indexOf(location.pathname);
+    const isCanvasRoute = canvasIndex !== -1;
 
     // Close mobile menu on route change
     useEffect(() => {
@@ -288,30 +269,20 @@ export default function Layout() {
             </aside>
 
             {/* ── Main Content ── */}
-            {/* Desktop: normal Outlet */}
-            <main className="hidden md:block flex-1 w-full bg-transparent overflow-y-auto min-h-screen">
-                <div className="max-w-4xl mx-auto px-8 py-8">
-                    <Outlet />
-                </div>
-            </main>
-
-            {/* Mobile: Swipe Canvas for main tabs — other routes use overlay */}
-            <div className="flex md:hidden flex-1 flex-col overflow-hidden" style={{ paddingBottom: '4rem' }}>
-                {isSwipeRoute ? (
-                    <SwipeNavigator
-                        screens={swipeScreens}
-                        currentIndex={currentSwipeIndex}
-                        onNavigate={handleSwipeNavigate}
-                    />
+            <main
+                className="flex-1 w-full bg-transparent overflow-y-auto pb-20 md:pb-0"
+                style={isCanvasRoute ? { display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 } : {}}
+            >
+                {isCanvasRoute ? (
+                    // Horizontal canvas — all 3 pages mounted simultaneously
+                    <SwipeNavigator currentIndex={canvasIndex} />
                 ) : (
-                    // Non-swipeable route (Friends, Shop, Settings, etc) — normal scroll
-                    <div className="flex-1 overflow-y-auto overscroll-none">
-                        <div className="max-w-4xl mx-auto px-5 py-8 min-h-full">
-                            <Outlet />
-                        </div>
+                    // Standard routes (friends, shop, settings, etc.) with scroll
+                    <div className="max-w-4xl mx-auto px-8 py-8">
+                        <Outlet />
                     </div>
                 )}
-            </div>
+            </main>
 
             {/* ── Mobile Bottom Nav ── */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[60] flex items-center justify-around h-16 px-2 safe-area-pb"
