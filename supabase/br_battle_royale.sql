@@ -190,9 +190,8 @@ begin
   delete from br_cards where match_id = p_match_id;
   for i in 0..(v_count-1) loop
     -- value_index: floor(i/2) so each pair shares same value_hash
-    -- ensure digest receives a bytea input and explicit algorithm text to avoid ambiguous types
     insert into br_cards(match_id, idx, value_hash)
-    values (p_match_id, i, encode(digest((v_seed || '|' || floor(i/2)::text)::bytea, 'sha256'::text), 'hex'));
+    values (p_match_id, i, encode(digest(v_seed || '|' || floor(i/2)::text, 'sha256'::text), 'hex'::text));
   end loop;
 
   insert into br_events(match_id, event_type, payload) 

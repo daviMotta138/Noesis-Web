@@ -168,6 +168,17 @@ export default function BRLobby({ onMatchStart }: BRLobbyProps) {
       setInviteTarget(friend);
       setInviteCountdown(30);
       setInviteModalOpen(false);
+
+      // send invite link as in-app chat message to the friend
+      (async () => {
+        try {
+          await supabase
+            .from('messages')
+            .insert({ sender_id: user.id, recipient_id: friend.friend_id, content: link });
+        } catch (err) {
+          console.error('Erro ao enviar convite por chat', err);
+        }
+      })();
     } catch (e: any) {
       setError(e.message);
     }
