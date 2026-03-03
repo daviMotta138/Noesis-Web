@@ -6,10 +6,12 @@ import {
     LayoutDashboard, Users, Clock, Image as ImageIcon,
     Search, Trash2, Upload, Shield, Coins, Loader2, User, Music, Bell, Send
 } from 'lucide-react';
+// test utilities
+import { LeaguePromotionTester } from '../components/LeaguePromotionTester';
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
 
-type Tab = 'overview' | 'users' | 'time' | 'banners' | 'radio' | 'push';
+type Tab = 'overview' | 'users' | 'time' | 'banners' | 'radio' | 'push' | 'promo';
 
 export default function AdminPage() {
     const navigate = useNavigate();
@@ -43,6 +45,7 @@ export default function AdminPage() {
                     <TabButton active={activeTab === 'banners'} onClick={() => setActiveTab('banners')} icon={ImageIcon} label="Atualizações" />
                     <TabButton active={activeTab === 'radio'} onClick={() => setActiveTab('radio')} icon={Music} label="Rádio" />
                     <TabButton active={activeTab === 'push'} onClick={() => setActiveTab('push')} icon={Bell} label="Push Notif" />
+                    <TabButton active={activeTab === 'promo'} onClick={() => setActiveTab('promo')} icon={LayoutDashboard} label="Promoções" />
                     <TabButton active={activeTab === 'time'} onClick={() => setActiveTab('time')} icon={Clock} label="Testes/Tempo" />
                 </nav>
             </div>
@@ -58,6 +61,7 @@ export default function AdminPage() {
                             {activeTab === 'radio' && <RadioTab addLog={addLog} />}
                             {activeTab === 'push' && <PushTab addLog={addLog} />}
                             {activeTab === 'time' && <TimeTab addLog={addLog} session={session} user={user} phase={phase} setPhase={setPhase} setUnlockAt={setUnlockAt} loadActiveSession={loadActiveSession} fetchProfile={fetchProfile} />}
+                            {activeTab === 'promo' && <LeaguePromotionTester />}
                         </motion.div>
                     </AnimatePresence>
 

@@ -1,8 +1,8 @@
 {
-    "rewrites": [
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        }
-    ]
+  "crons": [
+    {
+      "path": "/api/promotions",
+      "schedule": "0 20 * * 0"
+    }
+  ]
 }

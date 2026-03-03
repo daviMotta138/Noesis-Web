@@ -123,20 +123,8 @@ export default function Layout() {
         setUser(null); setProfile(null);
     };
 
-    // Swipe Navigation Logic
-    const swipeTabs = ['/', '/ranking', '/friends', '/shop', '/profile'];
-    const currentIndex = swipeTabs.indexOf(location.pathname);
-
-    const onSwipe = (direction: number) => {
-        const nextIndex = currentIndex + direction;
-        if (nextIndex >= 0 && nextIndex < swipeTabs.length) {
-            navigate(swipeTabs[nextIndex]);
-            audio.play('nav');
-        }
-    };
-
     return (
-        <div className="flex min-h-screen bg-transparent" style={{ touchAction: 'pan-y' }}>
+        <div className="flex min-h-screen bg-transparent">
             <NotificationPrompt />
             <GiftClaimOverlay />
             <MusicPlayer />
@@ -275,29 +263,10 @@ export default function Layout() {
             </aside>
 
             {/* ── Main Content ── */}
-            <main className="flex-1 w-full bg-transparent overflow-y-auto pb-24 md:pb-0 min-h-screen">
-                <motion.div
-                    className="max-w-4xl mx-auto px-8 py-8 h-full"
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    onDragEnd={(_e, info) => {
-                        const threshold = 100;
-                        if (info.offset.x > threshold) onSwipe(-1);
-                        else if (info.offset.x < -threshold) onSwipe(1);
-                    }}
-                >
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={location.pathname}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <Outlet />
-                        </motion.div>
-                    </AnimatePresence>
-                </motion.div>
+            <main className="flex-1 w-full bg-transparent overflow-y-auto pb-20 md:pb-0 min-h-screen">
+                <div className="max-w-4xl mx-auto px-8 py-8">
+                    <Outlet />
+                </div>
             </main>
 
             {/* ── Mobile Bottom Nav ── */}

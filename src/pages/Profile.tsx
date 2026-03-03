@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Copy, LogOut, Loader2, Edit2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
+import { BadgeDisplay } from '../components/BadgeDisplay';
 import type { AvatarConfig } from '../components/Avatar2D';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
@@ -246,37 +247,17 @@ export default function ProfilePage() {
             {/* Badges / Broches (Phase 6.3) */}
             <div className="px-5 mt-8 mb-6">
                 <div className="flex justify-between items-end mb-4 border-b-2 pb-2" style={{ borderColor: 'var(--color-border)' }}>
-                    <h2 className="text-xl font-bold text-[var(--color-text)]">Conquistas</h2>
-                    <span className="text-[10px] font-bold text-[var(--color-primary)] uppercase tracking-widest cursor-pointer">
-                        VER TODAS
-                    </span>
+                    <h2 className="text-xl font-bold text-[var(--color-text)]">Broches de Conquista</h2>
                 </div>
-                {profile?.badges && profile.badges.length > 0 ? (
-                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
-                        {profile.badges.map(b => {
-                            const [league, posStr] = b.split('_');
-                            const pos = parseInt(posStr) || 3;
-                            let icon = '🥉';
-                            if (league === 'campeonato' || league === 'diamante') { icon = '💎'; }
-                            if (league === 'ouro' || pos === 1) { icon = '🥇'; }
-                            if (league === 'prata' || pos === 2) { icon = '🥈'; }
-
-                            return (
-                                <div key={b} className="flex flex-col items-center justify-center p-2 rounded-2xl relative overflow-hidden"
-                                    style={{ border: `2px solid var(--color-border)`, background: 'var(--color-surface)' }}>
-                                    <span className="text-3xl mb-1">{icon}</span>
-                                    <span className="text-[8px] font-black uppercase text-center w-full truncate" style={{ color: 'var(--color-text)' }}>
-                                        {league}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="rounded-2xl p-6 text-center" style={{ border: '2px dashed var(--color-border)' }}>
-                        <p className="text-xs font-bold text-[var(--color-text-muted)]">Nenhuma conquista ainda.</p>
-                        <p className="text-[10px] text-[var(--color-text-muted)] mt-1">Gere conquistas vencendo Ligas semanais.</p>
-                    </div>
+                
+                {/* Badge Display Component */}
+                {user?.id && (
+                    <BadgeDisplay 
+                        userId={user.id}
+                        showTitle={false}
+                        maxDisplay={12}
+                        variant="grid"
+                    />
                 )}
             </div>
 

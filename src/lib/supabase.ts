@@ -41,6 +41,12 @@ export interface Profile {
     badges?: string[];
     last_played_date?: string;
     last_shield_check?: string;
+    previous_league?: string | null;
+    promotion_timestamp?: string | null;
+    demotion_timestamp?: string | null;
+    last_season_rank?: number | null;
+    promotion_seen?: boolean;
+    demotion_seen?: boolean;
 }
 
 export interface DailySession {

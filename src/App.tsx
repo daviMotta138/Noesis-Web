@@ -19,26 +19,23 @@ import Layout from './components/Layout';
 import PlaygroundPage from './pages/Playground';
 import { ChangelogModal } from './components/ChangelogModal';
 
-import { PushNotifications } from '@capacitor/push-notifications';
-import { SplashScreen } from '@capacitor/splash-screen';
-
 function AnimatedRoutes() {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/ranking" element={<RankingPage />} />
-          <Route path="/friends" element={<FriendsPage />} />
-          <Route path="/shop" element={<ShopPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/nous" element={<NousStorePage />} />
-          <Route path="/streak" element={<StreakPage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/playground" element={<PlaygroundPage />} />
+          <Route path="/" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><HomePage /></motion.div>} />
+          <Route path="/ranking" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RankingPage /></motion.div>} />
+          <Route path="/friends" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><FriendsPage /></motion.div>} />
+          <Route path="/shop" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ShopPage /></motion.div>} />
+          <Route path="/profile" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ProfilePage /></motion.div>} />
+          <Route path="/nous" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><NousStorePage /></motion.div>} />
+          <Route path="/streak" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><StreakPage /></motion.div>} />
+          <Route path="/admin" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><AdminPage /></motion.div>} />
+          <Route path="/notifications" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><NotificationsPage /></motion.div>} />
+          <Route path="/settings" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SettingsPage /></motion.div>} />
+          <Route path="/playground" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlaygroundPage /></motion.div>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -50,22 +47,6 @@ export default function App() {
   const { user, setUser, fetchProfile } = useGameStore();
 
   useEffect(() => {
-    // Hide splash screen
-    SplashScreen.hide();
-
-    // Notification Logic
-    const setupNotifications = async () => {
-      let perm = await PushNotifications.checkPermissions();
-      if (perm.receive === 'prompt') {
-        perm = await PushNotifications.requestPermissions();
-      }
-      if (perm.receive === 'granted') {
-        await PushNotifications.register();
-      }
-    };
-
-    setupNotifications();
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) { setUser(session.user); fetchProfile(session.user.id); }
     });

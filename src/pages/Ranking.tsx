@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Trophy, Medal, Star, Crown, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
+import { PromotionModal } from '../components/PromotionModal';
+import { DemotionModal } from '../components/DemotionModal';
 
 function getNextSunday20h() {
     const now = new Date();
@@ -42,6 +44,10 @@ export default function RankingPage() {
     const [data, setData] = useState<RankEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [timeLeft, setTimeLeft] = useState<{ d: number, h: number, m: number } | null>(null);
+    const [showPromotionModal, setShowPromotionModal] = useState(false);
+    const [showDemotionModal, setShowDemotionModal] = useState(false);
+    const [promotionData, setPromotionData] = useState<{ from: string; to: string } | null>(null);
+    const [demotionData, setDemotionData] = useState<{ from: string; to: string } | null>(null);
 
     useEffect(() => {
         const target = getNextSunday20h();
@@ -64,7 +70,48 @@ export default function RankingPage() {
 
     useEffect(() => {
         fetchRanking();
+        checkPromotionStatus();
     }, [tab, user?.id]);
+
+    const checkPromotionStatus = async () => {
+        if (!user?.id) return;
+
+        try {
+            const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('promotion_timestamp, demotion_timestamp, previous_league, promotion_seen, demotion_seen, league')
+                .eq('id', user.id)
+                .single();
+
+            if (!error && profileData) {
+                // Check for unseen promotion
+                if (profileData.promotion_timestamp && !profileData.promotion_seen && profileData.previous_league) {
+                    setPromotionData({
+                        from: profileData.previous_league,
+                        to: profileData.league
+                    });
+                    setShowPromotionModal(true);
+
+                    // Mark as seen
+                    await supabase.rpc('mark_promotion_seen', { p_user_id: user.id });
+                }
+
+                // Check for unseen demotion
+                if (profileData.demotion_timestamp && !profileData.demotion_seen && profileData.previous_league) {
+                    setDemotionData({
+                        from: profileData.previous_league,
+                        to: profileData.league
+                    });
+                    setShowDemotionModal(true);
+
+                    // Mark as seen
+                    await supabase.rpc('mark_demotion_seen', { p_user_id: user.id });
+                }
+            }
+        } catch (e) {
+            console.error('Error checking promotion status:', e);
+        }
+    };
 
     const fetchRanking = async () => {
         setLoading(true);
@@ -97,6 +144,30 @@ export default function RankingPage() {
 
     return (
         <div className="min-h-screen pb-24">
+            {/* Modals */}
+            {promotionData && (
+                <PromotionModal
+                    isOpen={showPromotionModal}
+                    fromLeague={promotionData.from}
+                    toLeague={promotionData.to}
+                    onClose={() => {
+                        setShowPromotionModal(false);
+                        setPromotionData(null);
+                    }}
+                />
+            )}
+            {demotionData && (
+                <DemotionModal
+                    isOpen={showDemotionModal}
+                    fromLeague={demotionData.from}
+                    toLeague={demotionData.to}
+                    onClose={() => {
+                        setShowDemotionModal(false);
+                        setDemotionData(null);
+                    }}
+                />
+            )}
+
             {/* Header */}
             <div className="px-5 pt-10 pb-6">
                 <div className="flex justify-between items-end">
