@@ -17,6 +17,7 @@ import NotificationsPage from './pages/Notifications';
 import SettingsPage from './pages/Settings';
 import Layout from './components/Layout';
 import PlaygroundPage from './pages/Playground';
+import BattleRoyalePage from './pages/BattleRoyale';
 import { ChangelogModal } from './components/ChangelogModal';
 
 function AnimatedRoutes() {
@@ -36,6 +37,7 @@ function AnimatedRoutes() {
           <Route path="/notifications" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><NotificationsPage /></motion.div>} />
           <Route path="/settings" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SettingsPage /></motion.div>} />
           <Route path="/playground" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlaygroundPage /></motion.div>} />
+          <Route path="/battle-royale" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BattleRoyalePage /></motion.div>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

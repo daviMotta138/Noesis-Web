@@ -5,7 +5,7 @@ import { Gamepad2, Sparkles, Trophy, Zap, Crown } from 'lucide-react';
 export default function PlaygroundPage() {
     const navigate = useNavigate();
     const modes = [
-        { id: 'classic', title: 'Clássico', desc: 'O modo original de memorização.', icon: Sparkles, color: '#FFD700', active: true, path: '/home' },
+        { id: 'classic', title: 'Clássico', desc: 'O modo original de memorização.', icon: Sparkles, color: '#FFD700', active: true, path: '/' },
         { id: 'speed', title: 'Modo Rápido', desc: 'Menos tempo para memorizar, mais recompensas.', icon: Zap, color: '#FF4B4B', active: false, path: null },
         { id: 'league', title: 'Campeonatos', desc: 'Torneios semanais com prêmios exclusivos.', icon: Trophy, color: '#1CB0F6', active: false, path: null },
         { id: 'battle-royale', title: 'Battle Royale', desc: '8 jogadores competindo pelo topo do ranking.', icon: Crown, color: '#FF1493', active: true, path: '/battle-royale' },

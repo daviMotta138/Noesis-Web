@@ -1,7 +1,6 @@
 // src/pages/BattleRoyale.tsx
 // Battle Royale Memory Pairs - Main page
 
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/useGameStore';
 import { useMatchStore } from '../store/useMatchStore';
@@ -13,19 +12,17 @@ export default function BattleRoyalePage() {
   const { user } = useGameStore();
   const { match, reset } = useMatchStore();
 
-  useEffect(() => {
-    if (!user?.id) {
-      navigate('/auth');
-    }
-  }, [user?.id, navigate]);
-
   if (!user?.id) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800">
+        <p className="text-slate-400">Loading...</p>
+      </div>
+    );
   }
 
   const handleBackToHome = () => {
     reset();
-    navigate('/home');
+    navigate('/playground');
   };
 
   return (
@@ -58,7 +55,7 @@ export default function BattleRoyalePage() {
           matchId={match.id}
           onMatchEnd={() => {
             reset();
-            navigate('/home');
+            navigate('/playground');
           }}
         />
       )}
