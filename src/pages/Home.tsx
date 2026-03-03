@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle, ChevronDown } from 'lucide-react';
+import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle, ChevronDown, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore, TIME_OPTIONS } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
@@ -405,6 +405,18 @@ function WaitingPhase() {
         return () => clearInterval(id);
     }, [unlockAt, setPhase]);
 
+    // Get time option for display
+    const getTimeDisplay = () => {
+        if (!session?.time_option) return '24 horas';
+        const hours = session.time_option;
+        if (hours === 3) return '3 horas';
+        if (hours === 6) return '6 horas';
+        if (hours === 12) return '12 horas';
+        if (hours === 24) return '24 horas';
+        if (hours === 168) return '1 semana';
+        return `${hours} horas`;
+    };
+
     return (
         <div className="flex flex-col min-h-screen pb-24 pt-10 px-5">
             <div className="mb-8">
@@ -413,7 +425,7 @@ function WaitingPhase() {
                     Consolidando<br /><span className="text-gradient-gold">Memória</span>
                 </h2>
                 <p className="text-sm mt-3" style={{ color: 'var(--color-text-sub)' }}>
-                    Seu hipocampo está fixando as palavras. Aguarde o período de consolidação.
+                    Seu hipocampo está fixando as palavras. Aguarde o período de {getTimeDisplay()}.
                 </p>
             </div>
 
@@ -427,6 +439,16 @@ function WaitingPhase() {
                     onFinish={() => setPhase('recall')}
                     size={200}
                 />
+                <div className="mt-4 text-center">
+                    <p className="text-xs font-bold" style={{ color: 'var(--color-gold)' }}>
+                        {getTimeDisplay()} de espera
+                    </p>
+                    {session?.nous_reward && (
+                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                            Recompensa: {session.nous_reward} Nous
+                        </p>
+                    )}
+                </div>
             </div>
 
             {session && (
@@ -468,6 +490,18 @@ function RecallPhase() {
     const [nousAwarded, setNousAwarded] = useState(0);
     const [loading, setLoading] = useState(false);
     const [shieldUsed, setShieldUsed] = useState(false);
+
+    // Get time display for header
+    const getTimeDisplay = () => {
+        if (!session?.time_option) return '24 horas';
+        const hours = session.time_option;
+        if (hours === 3) return '3 horas';
+        if (hours === 6) return '6 horas';
+        if (hours === 12) return '12 horas';
+        if (hours === 24) return '24 horas';
+        if (hours === 168) return '1 semana';
+        return `${hours} horas`;
+    };
 
     const handleSubmit = async () => {
         const res = scoreAnswers(answers.filter(Boolean), words);
@@ -562,7 +596,7 @@ function RecallPhase() {
     return (
         <div className="flex flex-col pt-10 pb-24 px-5 min-h-screen">
             <div className="mb-8">
-                <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--color-gold-dim)' }}>24 horas passaram</p>
+                <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--color-gold-dim)' }}>{getTimeDisplay()} passaram</p>
                 <h2 className="text-3xl font-black text-display" style={{ lineHeight: 1.1 }}>
                     Hora do<br /><span className="text-gradient-gold">Teste</span>
                 </h2>
@@ -596,7 +630,7 @@ function RecallPhase() {
 function ResultPhase() {
     const { profile, setPhase, setSession, setUnlockAt } = useGameStore();
 
-    const handleReset = () => {
+    const handleClose = () => {
         setSession(null);
         setUnlockAt(null);
         setPhase('viewing');
@@ -637,9 +671,9 @@ function ResultPhase() {
                 </div>
             </div>
 
-            {/* Continue — available to all users */}
-            <button onClick={handleReset} className="btn-gold w-full max-w-xs flex items-center justify-center gap-2">
-                CONTINUAR <ChevronRightCircle size={16} />
+            {/* Close button - returns to viewing phase */}
+            <button onClick={handleClose} className="btn-gold w-full max-w-xs flex items-center justify-center gap-2">
+                FECHAR <X size={16} />
             </button>
         </div>
     );
