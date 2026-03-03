@@ -13,7 +13,6 @@ import { GiftClaimOverlay } from './GiftClaimOverlay';
 import { MusicPlayer, MusicPlayerUI } from './MusicPlayer';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
-import { SwipeNavigator } from './SwipeNavigator';
 
 const BASE_NAV = [
     { to: '/', icon: Home, label: 'Início', adminOnly: false },
@@ -33,11 +32,6 @@ export default function Layout() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [chatToast, setChatToast] = useState<any | null>(null);
-
-    // Canvas tabs — these stay mounted and use SwipeNavigator
-    const CANVAS_PATHS = ['/', '/ranking', '/profile'];
-    const canvasIndex = CANVAS_PATHS.indexOf(location.pathname);
-    const isCanvasRoute = canvasIndex !== -1;
 
     // Close mobile menu on route change
     useEffect(() => {
@@ -269,19 +263,10 @@ export default function Layout() {
             </aside>
 
             {/* ── Main Content ── */}
-            <main
-                className="flex-1 w-full bg-transparent overflow-y-auto pb-20 md:pb-0"
-                style={isCanvasRoute ? { display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 } : {}}
-            >
-                {isCanvasRoute ? (
-                    // Horizontal canvas — all 3 pages mounted simultaneously
-                    <SwipeNavigator currentIndex={canvasIndex} />
-                ) : (
-                    // Standard routes (friends, shop, settings, etc.) with scroll
-                    <div className="max-w-4xl mx-auto px-8 py-8">
-                        <Outlet />
-                    </div>
-                )}
+            <main className="flex-1 w-full bg-transparent overflow-y-auto pb-20 md:pb-0 min-h-screen">
+                <div className="max-w-4xl mx-auto px-8 py-8">
+                    <Outlet />
+                </div>
             </main>
 
             {/* ── Mobile Bottom Nav ── */}
