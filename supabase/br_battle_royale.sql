@@ -104,11 +104,19 @@ create policy "cards_select_authenticated" on br_cards for select using (auth.ro
 
 create policy "events_select_authenticated" on br_events for select using (auth.role() = 'authenticated');
 
+-- ensure policies are idempotent
+-- queue policy
+drop policy if exists "queue_select_authenticated" on br_queue;
 create policy "queue_select_authenticated" on br_queue for select using (auth.role() = 'authenticated');
+-- no insert policy for queue (users added via RPC)
 
 -- invites should also be visible to authenticated users
+-- drop prior invite policies too
+drop policy if exists "invites_select_authenticated" on br_invites;
+drop policy if exists "invites_insert_authenticated" on br_invites;
 create policy "invites_select_authenticated" on br_invites for select using (auth.role() = 'authenticated');
-create policy "invites_insert_authenticated" on br_invites for insert using (auth.role() = 'authenticated');
+-- insert policies require WITH CHECK
+create policy "invites_insert_authenticated" on br_invites for insert with check (auth.role() = 'authenticated');
 
 -- RPCs / Functions
 
@@ -182,7 +190,9 @@ begin
   delete from br_cards where match_id = p_match_id;
   for i in 0..(v_count-1) loop
     -- value_index: floor(i/2) so each pair shares same value_hash
-    insert into br_cards(match_id, idx, value_hash) values (p_match_id, i, encode(digest(v_seed || '|' || floor(i/2)::text, 'sha256'), 'hex'));
+    -- ensure digest receives a bytea input and explicit algorithm text to avoid ambiguous types
+    insert into br_cards(match_id, idx, value_hash)
+    values (p_match_id, i, encode(digest((v_seed || '|' || floor(i/2)::text)::bytea, 'sha256'::text), 'hex'));
   end loop;
 
   insert into br_events(match_id, event_type, payload) 
