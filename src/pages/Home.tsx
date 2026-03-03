@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle, ChevronDown, X } from 'lucide-react';
+import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useGameStore, TIME_OPTIONS } from '../store/useGameStore';
+import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
 import { drawWords, WORD_COUNT_OPTIONS } from '../lib/words';
 import { scoreAnswers } from '../lib/levenshtein';
@@ -14,14 +14,26 @@ import shieldImg from '../assets/shield.png';
 
 // ─── Viewing Phase ────────────────────────────────────────────────────────────
 function ViewingPhase() {
-    const { profile, wordCount, setWordCount, selectedTimeOption, setSelectedTimeOption, session, startSession } = useGameStore();
+    const { profile, wordCount, setWordCount, session, startSession, challengeHours, challengeReward, setChallengeHours, setChallengeReward } = useGameStore();
     const navigate = useNavigate();
     const [words, setWords] = useState<string[]>(() => drawWords(wordCount));
-    const [flipped, setFlipped] = useState(false); // ALL cards flipped at once
+    const [flipped, setFlipped] = useState(false);
     const [loading, setLoading] = useState(false);
     const [banners, setBanners] = useState<any[]>([]);
     const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-    const [timeDropdownOpen, setTimeDropdownOpen] = useState(false);
+
+    // Load stored weekly challenge info
+    const weeklyUsedKey = `noesis_weekly_challenge_${new Date().getFullYear()}_${new Date().getMonth()}`;
+    const weeklyAlreadyUsed = !!localStorage.getItem(weeklyUsedKey);
+
+    // Challenge options: { hours, reward, label, isWeekly }
+    const CHALLENGE_OPTIONS = [
+        { hours: 3, reward: 5, label: '3h', desc: '3 horas', weekly: false },
+        { hours: 6, reward: 10, label: '6h', desc: '6 horas', weekly: false },
+        { hours: 12, reward: 20, label: '12h', desc: '12 horas', weekly: false },
+        { hours: 24, reward: 35, label: '24h', desc: '24 horas', weekly: false },
+        { hours: 168, reward: 100, label: '1 sem', desc: '1 semana', weekly: true },
+    ];
 
     useEffect(() => {
         // Fetch active banners on mount
@@ -47,21 +59,6 @@ function ViewingPhase() {
         if (!flipped) { setWords(drawWords(wordCount)); }
     }, [wordCount, flipped]);
 
-    // Click outside handler for dropdown
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement;
-            if (!target.closest('.time-dropdown-container')) {
-                setTimeDropdownOpen(false);
-            }
-        };
-
-        if (timeDropdownOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [timeDropdownOpen]);
-
     // If there's already an active session, restore it
     useEffect(() => {
         if (session?.words) { setWords(session.words); setFlipped(true); }
@@ -72,13 +69,10 @@ function ViewingPhase() {
         audio.play('flip');
         setFlipped(true);
         setLoading(true);
-        try {
-            await startSession(words, selectedTimeOption);
-        } catch (error) {
-            console.error('Error starting session:', error);
-            alert(error instanceof Error ? error.message : 'Erro ao iniciar sessão');
-            setFlipped(false);
+        if (challengeHours === 168) {
+            localStorage.setItem(weeklyUsedKey, 'true');
         }
+        await startSession(words, challengeHours, challengeReward);
         setLoading(false);
     };
 
@@ -161,7 +155,57 @@ function ViewingPhase() {
                 </div>
             )}
 
-            {/* Word count selector — locked after flip */}
+            {/* Challenge time selector — locked after flip */}
+            {!flipped && (
+                <div className="px-5 mb-5">
+                    <div className="panel p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                                ⚡ Tempo de Desafio
+                            </p>
+                            <span className="text-lg font-black text-gradient-gold">
+                                +{challengeReward} <img src={coinImg} className="inline w-3.5 h-3.5 object-contain mb-0.5" alt="" />
+                            </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {CHALLENGE_OPTIONS.map(opt => {
+                                const isSelected = challengeHours === opt.hours;
+                                const isDisabled = opt.weekly && weeklyAlreadyUsed;
+                                return (
+                                    <button
+                                        key={opt.hours}
+                                        disabled={isDisabled}
+                                        onClick={() => { setChallengeHours(opt.hours); setChallengeReward(opt.reward); audio.play('nav'); }}
+                                        className="flex flex-col items-center px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 relative"
+                                        style={{
+                                            background: isSelected
+                                                ? (opt.weekly ? 'linear-gradient(135deg, #7C3AED, #A855F7)' : 'linear-gradient(135deg, #C49333, #E8B84B)')
+                                                : 'var(--color-glass)',
+                                            color: isSelected ? '#0D0F1C' : (opt.weekly ? '#A855F7' : 'var(--color-text-muted)'),
+                                            border: isSelected ? 'none' : (opt.weekly ? '1px solid rgba(168,85,247,0.3)' : '1px solid var(--color-border)'),
+                                            opacity: isDisabled ? 0.4 : 1,
+                                            minWidth: 52,
+                                        }}
+                                    >
+                                        <span>{opt.label}</span>
+                                        <span className="text-[9px] mt-0.5 opacity-80">+{opt.reward}🪙</span>
+                                        {opt.weekly && (
+                                            <span className="absolute -top-2 -right-1 text-[8px] font-black px-1 rounded-full"
+                                                style={{ background: '#7C3AED', color: 'white' }}>
+                                                {isDisabled ? '✓ usado' : '1×/mês'}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                            Espere o tempo e acerte todas as palavras para ganhar os Nous!
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="px-5 mb-5">
                 <div className="panel p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -192,131 +236,6 @@ function ViewingPhase() {
                                     {n}
                                 </button>
                             ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Time selection — locked after flip */}
-            <div className="px-5 mb-5">
-                <div className="panel p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                                Tempo de espera
-                            </p>
-                            {flipped && <Lock size={12} style={{ color: 'var(--color-gold-dim)' }} />}
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
-                            <span className="text-sm font-black text-gradient-gold">{selectedTimeOption.nousReward}</span>
-                        </div>
-                    </div>
-
-                    {flipped ? (
-                        // Locked state
-                        <div className="rounded-xl p-2.5 text-xs" style={{ background: 'rgba(212,168,83,0.07)', border: '1px solid rgba(212,168,83,0.15)', color: 'var(--color-gold-dim)' }}>
-                            🔒 Tempo fixo até o resultado. {selectedTimeOption.label} selecionado.
-                        </div>
-                    ) : (
-                        // Dropdown menu
-                        <div className="relative time-dropdown-container">
-                            <button
-                                onClick={() => setTimeDropdownOpen(!timeDropdownOpen)}
-                                className="w-full px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 flex items-center justify-between"
-                                style={{
-                                    background: 'var(--color-glass)',
-                                    color: 'var(--color-text)',
-                                    border: '1px solid var(--color-border)',
-                                }}>
-                                <div className="flex items-center gap-2">
-                                    <span>{selectedTimeOption.label}</span>
-                                    {selectedTimeOption.isMonthlyChallenge && (
-                                        <span className="px-1.5 py-0.5 rounded text-xs font-bold"
-                                            style={{ 
-                                                background: 'var(--color-success)', 
-                                                color: 'white' 
-                                            }}>
-                                            DESAFIO
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
-                                    <span>{selectedTimeOption.nousReward}</span>
-                                    <ChevronDown size={14} style={{ 
-                                        transition: 'transform 0.2s',
-                                        transform: timeDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-                                    }} />
-                                </div>
-                            </button>
-
-                            <AnimatePresence>
-                                {timeDropdownOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        transition={{ duration: 0.15 }}
-                                        style={{ 
-                                            background: '#1a1a2e', 
-                                            border: '1px solid var(--color-border)', 
-                                            borderRadius: '0.75rem',
-                                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                                            overflow: 'hidden'
-                                        }}>
-                                        <div className="max-h-48 overflow-y-auto">
-                                            {TIME_OPTIONS.map((option) => {
-                                                const isMonthlyChallengeUsed = profile?.challenge_month_used === new Date().toISOString().slice(0, 7);
-                                                const isDisabled = option.isMonthlyChallenge && isMonthlyChallengeUsed;
-                                                const isSelected = selectedTimeOption.hours === option.hours;
-                                                
-                                                return (
-                                                    <button
-                                                        key={option.hours}
-                                                        onClick={() => {
-                                                            if (!isDisabled) {
-                                                                setSelectedTimeOption(option);
-                                                                setTimeDropdownOpen(false);
-                                                            }
-                                                        }}
-                                                        disabled={isDisabled}
-                                                        className="w-full px-3 py-2 text-xs font-black transition-all duration-150 flex items-center justify-between border-b last:border-b-0"
-                                                        style={{
-                                                            background: isSelected 
-                                                                ? '#d4a833' 
-                                                                : '#0f0f23',
-                                                            color: isSelected 
-                                                                ? '#0D0F1C' 
-                                                                : isDisabled 
-                                                                ? 'var(--color-text-muted)' 
-                                                                : 'var(--color-text)',
-                                                            opacity: isDisabled ? 0.5 : 1,
-                                                            cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                                        }}>
-                                                        <div className="flex items-center gap-2">
-                                                            <span>{option.label}</span>
-                                                            {option.isMonthlyChallenge && (
-                                                                <span className="px-1.5 py-0.5 rounded text-xs font-bold"
-                                                                    style={{ 
-                                                                        background: isDisabled ? 'var(--color-danger)' : 'var(--color-success)', 
-                                                                        color: 'white' 
-                                                                    }}>
-                                                                    {isDisabled ? 'USADO' : 'DESAFIO'}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
-                                                            <span>{option.nousReward}</span>
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
                         </div>
                     )}
                 </div>
@@ -405,18 +324,6 @@ function WaitingPhase() {
         return () => clearInterval(id);
     }, [unlockAt, setPhase]);
 
-    // Get time option for display
-    const getTimeDisplay = () => {
-        if (!session?.time_option) return '24 horas';
-        const hours = session.time_option;
-        if (hours === 3) return '3 horas';
-        if (hours === 6) return '6 horas';
-        if (hours === 12) return '12 horas';
-        if (hours === 24) return '24 horas';
-        if (hours === 168) return '1 semana';
-        return `${hours} horas`;
-    };
-
     return (
         <div className="flex flex-col min-h-screen pb-24 pt-10 px-5">
             <div className="mb-8">
@@ -425,7 +332,7 @@ function WaitingPhase() {
                     Consolidando<br /><span className="text-gradient-gold">Memória</span>
                 </h2>
                 <p className="text-sm mt-3" style={{ color: 'var(--color-text-sub)' }}>
-                    Seu hipocampo está fixando as palavras. Aguarde o período de {getTimeDisplay()}.
+                    Seu hipocampo está fixando as palavras. Aguarde o período de consolidação.
                 </p>
             </div>
 
@@ -439,16 +346,6 @@ function WaitingPhase() {
                     onFinish={() => setPhase('recall')}
                     size={200}
                 />
-                <div className="mt-4 text-center">
-                    <p className="text-xs font-bold" style={{ color: 'var(--color-gold)' }}>
-                        {getTimeDisplay()} de espera
-                    </p>
-                    {session?.nous_reward && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                            Recompensa: {session.nous_reward} Nous
-                        </p>
-                    )}
-                </div>
             </div>
 
             {session && (
@@ -491,24 +388,13 @@ function RecallPhase() {
     const [loading, setLoading] = useState(false);
     const [shieldUsed, setShieldUsed] = useState(false);
 
-    // Get time display for header
-    const getTimeDisplay = () => {
-        if (!session?.time_option) return '24 horas';
-        const hours = session.time_option;
-        if (hours === 3) return '3 horas';
-        if (hours === 6) return '6 horas';
-        if (hours === 12) return '12 horas';
-        if (hours === 24) return '24 horas';
-        if (hours === 168) return '1 semana';
-        return `${hours} horas`;
-    };
-
     const handleSubmit = async () => {
         const res = scoreAnswers(answers.filter(Boolean), words);
         const correct = res.filter(r => r.correct).length;
         const score = correct * (words.length <= 3 ? 50 : words.length <= 9 ? 30 : 20);
-        // Get the reward from session or fallback to 15 for backward compatibility
-        const nous = correct === words.length ? (session?.nous_reward ?? 15) : 0;
+        // Nous based on challenge reward stored in session
+        const nousReward = (session as any)?.nous_reward ?? 15;
+        const nous = correct === words.length ? nousReward : 0;
 
         if (correct === words.length) audio.play('success');
         else if (correct >= words.length / 2) audio.play('match');
@@ -596,7 +482,7 @@ function RecallPhase() {
     return (
         <div className="flex flex-col pt-10 pb-24 px-5 min-h-screen">
             <div className="mb-8">
-                <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--color-gold-dim)' }}>{getTimeDisplay()} passaram</p>
+                <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--color-gold-dim)' }}>24 horas passaram</p>
                 <h2 className="text-3xl font-black text-display" style={{ lineHeight: 1.1 }}>
                     Hora do<br /><span className="text-gradient-gold">Teste</span>
                 </h2>
@@ -630,7 +516,7 @@ function RecallPhase() {
 function ResultPhase() {
     const { profile, setPhase, setSession, setUnlockAt } = useGameStore();
 
-    const handleClose = () => {
+    const handleReset = () => {
         setSession(null);
         setUnlockAt(null);
         setPhase('viewing');
@@ -671,9 +557,9 @@ function ResultPhase() {
                 </div>
             </div>
 
-            {/* Close button - returns to viewing phase */}
-            <button onClick={handleClose} className="btn-gold w-full max-w-xs flex items-center justify-center gap-2">
-                FECHAR <X size={16} />
+            {/* Continue — available to all users */}
+            <button onClick={handleReset} className="btn-gold w-full max-w-xs flex items-center justify-center gap-2">
+                CONTINUAR <ChevronRightCircle size={16} />
             </button>
         </div>
     );

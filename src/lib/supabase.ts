@@ -47,7 +47,6 @@ export interface Profile {
     last_season_rank?: number | null;
     promotion_seen?: boolean;
     demotion_seen?: boolean;
-    challenge_month_used?: string; // YYYY-MM format for monthly challenge tracking
 }
 
 export interface DailySession {
@@ -60,8 +59,6 @@ export interface DailySession {
     answers: string[] | null;
     score: number;
     success: boolean | null;
-    time_option: number; // hours: 3, 6, 12, 24, or 168 (1 week)
-    nous_reward: number; // reward based on time option
 }
 
 export interface ShopItem {

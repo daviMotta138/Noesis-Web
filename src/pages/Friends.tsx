@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Send, Search, Check, X, Users, MessageCircle, ChevronLeft, Gift } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
-import { sendPushNotification } from '../lib/notifications';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
@@ -361,83 +360,41 @@ export default function FriendsPage() {
         setSearchResult(data);
     };
 
-    const handleAddFriend = async () => {
-        if (!searchResult || !user?.id) return;
-        const already = friends.find(f => f.id === searchResult.id);
+    const handleAddFriend = async (targetId?: string) => {
+        const tid = targetId ?? searchResult?.id;
+        if (!tid || !user?.id) return;
+        const already = friends.find(f => f.id === tid);
         if (already) { setSearchError('Já é seu amigo ou pedido pendente.'); return; }
-        
-        // Create pending friendship request
-        const { error } = await supabase.from('friendships').insert({
-            user_id: user.id, 
-            friend_id: searchResult.id, 
-            status: 'pending',
-        });
-        
-        if (error) {
-            setSearchError('Erro ao enviar solicitação. Tente novamente.');
-            return;
-        }
 
-        // Send notification to the recipient
-        await sendPushNotification('Nova solicitação de amizade!', {
-            body: `${profile?.display_name || 'Alguém'} quer ser seu amigo!`,
-            icon: profile?.avatar_url || '/vite.svg',
-            tag: `friend_request_${user.id}_${searchResult.id}`,
+        // Insert pending friendship
+        await supabase.from('friendships').insert({
+            user_id: user.id, friend_id: tid, status: 'pending',
         });
 
-        // Create in-app notification
+        // Notify the target user
         await supabase.from('notifications').insert({
-            user_id: searchResult.id,
+            user_id: tid,
             type: 'friend_request',
-            title: 'Nova solicitação de amizade!',
-            body: `${profile?.display_name || 'Alguém'} quer ser seu amigo!`,
-            data: {
-                sender_id: user.id,
-                sender_name: profile?.display_name || 'Alguém',
-                sender_avatar: profile?.avatar_url
-            }
+            title: 'Solicitação de amizade',
+            body: `${profile?.display_name ?? 'Alguém'} quer ser seu amigo!`,
+            metadata: JSON.stringify({ sender_id: user.id, sender_name: profile?.display_name }),
         });
 
-        setSearchResult(null); 
-        setSearchId('');
+        setSearchResult(null); setSearchId('');
         fetchFriends();
     };
 
-    const handleAccept = async (friendshipId: string) => {
-        // Get friendship details to find who sent the request
-        const { data: friendship } = await supabase
-            .from('friendships')
-            .select('user_id, friend_id')
-            .eq('id', friendshipId)
-            .single();
-
-        if (friendship) {
-            // Update status to accepted
-            await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
-
-            // Send notification to the person who sent the request
-            const senderId = friendship.user_id === user?.id ? friendship.friend_id : friendship.user_id;
-            
-            await sendPushNotification('Solicitação de amizade aceita!', {
-                body: `${profile?.display_name || 'Alguém'} aceitou sua solicitação de amizade!`,
-                icon: profile?.avatar_url || '/vite.svg',
-                tag: `friend_accepted_${user?.id}_${senderId}`,
-            });
-
-            // Create in-app notification
+    const handleAccept = async (friendshipId: string, senderId?: string) => {
+        await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+        // Notify sender that request was accepted
+        if (senderId) {
             await supabase.from('notifications').insert({
                 user_id: senderId,
                 type: 'friend_accepted',
-                title: 'Solicitação de amizade aceita!',
-                body: `${profile?.display_name || 'Alguém'} aceitou sua solicitação de amizade!`,
-                data: {
-                    friend_id: user?.id,
-                    friend_name: profile?.display_name || 'Alguém',
-                    friend_avatar: profile?.avatar_url
-                }
+                title: 'Amizade aceita! 🎉',
+                body: `${profile?.display_name ?? 'Alguém'} aceitou seu pedido de amizade!`,
             });
         }
-
         fetchFriends();
     };
 
@@ -522,10 +479,10 @@ export default function FriendsPage() {
                                         <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{searchResult.display_name}</p>
                                         <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{searchResult.friend_id}</p>
                                     </div>
-                                    <button onClick={handleAddFriend}
+                                    <button onClick={() => handleAddFriend(searchResult.id)}
                                         className="px-3 py-1.5 rounded-lg text-xs font-black"
                                         style={{ background: 'linear-gradient(135deg, #C49333, #E8B84B)', color: '#0D0F1C' }}>
-                                        + Amigo
+                                        + Solicitar
                                     </button>
                                 </motion.div>
                             )}
@@ -564,7 +521,7 @@ export default function FriendsPage() {
                                         </div>
                                         {f.status === 'pending_received' && (
                                             <div className="flex gap-1">
-                                                <button onClick={() => handleAccept(f.friendshipId)}
+                                                <button onClick={() => handleAccept(f.friendshipId, f.id)}
                                                     className="w-7 h-7 rounded-lg flex items-center justify-center"
                                                     style={{ background: 'rgba(45,212,191,0.15)', color: 'var(--color-success)' }}>
                                                     <Check size={13} />
