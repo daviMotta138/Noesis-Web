@@ -68,25 +68,20 @@ create table if not exists br_invites (
   created_at timestamptz not null default now()
 );
 
--- Simple policies: participants can read match/player rows when they belong
+-- Simple policies: authenticated users can read BR data
+-- (RPCs handle authorization internally with security definer)
 alter table br_matches enable row level security;
 alter table br_players enable row level security;
 alter table br_cards enable row level security;
 alter table br_events enable row level security;
 
-create policy "public_select_matches" on br_matches for select using (true);
+create policy "matches_select_authenticated" on br_matches for select using (auth.role() = 'authenticated');
 
-create policy "players_select_if_participant" on br_players for select using (
-  exists (select 1 from br_players p2 where p2.match_id = br_players.match_id and p2.user_id = auth.uid())
-);
+create policy "players_select_authenticated" on br_players for select using (auth.role() = 'authenticated');
 
-create policy "cards_select_if_participant" on br_cards for select using (
-  exists (select 1 from br_players p2 where p2.match_id = br_cards.match_id and p2.user_id = auth.uid())
-);
+create policy "cards_select_authenticated" on br_cards for select using (auth.role() = 'authenticated');
 
-create policy "events_select_if_participant" on br_events for select using (
-  exists (select 1 from br_players p2 where p2.match_id = br_events.match_id and p2.user_id = auth.uid())
-);
+create policy "events_select_authenticated" on br_events for select using (auth.role() = 'authenticated');
 
 -- RPCs / Functions
 
