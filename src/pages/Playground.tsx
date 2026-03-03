@@ -1,11 +1,14 @@
 import { motion } from 'framer-motion';
-import { Gamepad2, Sparkles, Trophy, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Gamepad2, Sparkles, Trophy, Zap, Crown } from 'lucide-react';
 
 export default function PlaygroundPage() {
+    const navigate = useNavigate();
     const modes = [
-        { id: 'classic', title: 'Clássico', desc: 'O modo original de memorização.', icon: Sparkles, color: '#FFD700', active: true },
-        { id: 'speed', title: 'Modo Rápido', desc: 'Menos tempo para memorizar, mais recompensas.', icon: Zap, color: '#FF4B4B', active: false },
-        { id: 'league', title: 'Campeonatos', desc: 'Torneios semanais com prêmios exclusivos.', icon: Trophy, color: '#1CB0F6', active: false },
+        { id: 'classic', title: 'Clássico', desc: 'O modo original de memorização.', icon: Sparkles, color: '#FFD700', active: true, path: '/home' },
+        { id: 'speed', title: 'Modo Rápido', desc: 'Menos tempo para memorizar, mais recompensas.', icon: Zap, color: '#FF4B4B', active: false, path: null },
+        { id: 'league', title: 'Campeonatos', desc: 'Torneios semanais com prêmios exclusivos.', icon: Trophy, color: '#1CB0F6', active: false, path: null },
+        { id: 'battle-royale', title: 'Battle Royale', desc: '8 jogadores competindo pelo topo do ranking.', icon: Crown, color: '#FF1493', active: true, path: '/battle-royale' },
     ];
 
     return (
@@ -23,7 +26,8 @@ export default function PlaygroundPage() {
                         key={mode.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`relative p-6 rounded-3xl border-2 transition-all ${mode.active ? 'border-[var(--color-gold-dim)]' : 'border-white/5 opacity-60'}`}
+                        onClick={() => mode.active && mode.path && navigate(mode.path)}
+                        className={`relative p-6 rounded-3xl border-2 transition-all cursor-pointer ${mode.active ? 'border-[var(--color-gold-dim)] hover:scale-105 hover:shadow-lg' : 'border-white/5 opacity-60'}`}
                         style={{ background: mode.active ? 'var(--color-glass-strong)' : 'var(--color-glass)' }}
                     >
                         <div className="flex gap-4 items-center">
