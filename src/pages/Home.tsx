@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle } from 'lucide-react';
+import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useGameStore } from '../store/useGameStore';
+import { useGameStore, TIME_OPTIONS } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
 import { drawWords, WORD_COUNT_OPTIONS } from '../lib/words';
 import { scoreAnswers } from '../lib/levenshtein';
@@ -14,13 +14,14 @@ import shieldImg from '../assets/shield.png';
 
 // ─── Viewing Phase ────────────────────────────────────────────────────────────
 function ViewingPhase() {
-    const { profile, wordCount, setWordCount, session, startSession } = useGameStore();
+    const { profile, wordCount, setWordCount, selectedTimeOption, setSelectedTimeOption, session, startSession } = useGameStore();
     const navigate = useNavigate();
     const [words, setWords] = useState<string[]>(() => drawWords(wordCount));
     const [flipped, setFlipped] = useState(false); // ALL cards flipped at once
     const [loading, setLoading] = useState(false);
     const [banners, setBanners] = useState<any[]>([]);
     const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+    const [timeDropdownOpen, setTimeDropdownOpen] = useState(false);
 
     useEffect(() => {
         // Fetch active banners on mount
@@ -46,6 +47,21 @@ function ViewingPhase() {
         if (!flipped) { setWords(drawWords(wordCount)); }
     }, [wordCount, flipped]);
 
+    // Click outside handler for dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.time-dropdown-container')) {
+                setTimeDropdownOpen(false);
+            }
+        };
+
+        if (timeDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [timeDropdownOpen]);
+
     // If there's already an active session, restore it
     useEffect(() => {
         if (session?.words) { setWords(session.words); setFlipped(true); }
@@ -56,7 +72,13 @@ function ViewingPhase() {
         audio.play('flip');
         setFlipped(true);
         setLoading(true);
-        await startSession(words);
+        try {
+            await startSession(words, selectedTimeOption);
+        } catch (error) {
+            console.error('Error starting session:', error);
+            alert(error instanceof Error ? error.message : 'Erro ao iniciar sessão');
+            setFlipped(false);
+        }
         setLoading(false);
     };
 
@@ -170,6 +192,131 @@ function ViewingPhase() {
                                     {n}
                                 </button>
                             ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Time selection — locked after flip */}
+            <div className="px-5 mb-5">
+                <div className="panel p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                                Tempo de espera
+                            </p>
+                            {flipped && <Lock size={12} style={{ color: 'var(--color-gold-dim)' }} />}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
+                            <span className="text-sm font-black text-gradient-gold">{selectedTimeOption.nousReward}</span>
+                        </div>
+                    </div>
+
+                    {flipped ? (
+                        // Locked state
+                        <div className="rounded-xl p-2.5 text-xs" style={{ background: 'rgba(212,168,83,0.07)', border: '1px solid rgba(212,168,83,0.15)', color: 'var(--color-gold-dim)' }}>
+                            🔒 Tempo fixo até o resultado. {selectedTimeOption.label} selecionado.
+                        </div>
+                    ) : (
+                        // Dropdown menu
+                        <div className="relative time-dropdown-container">
+                            <button
+                                onClick={() => setTimeDropdownOpen(!timeDropdownOpen)}
+                                className="w-full px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 flex items-center justify-between"
+                                style={{
+                                    background: 'var(--color-glass)',
+                                    color: 'var(--color-text)',
+                                    border: '1px solid var(--color-border)',
+                                }}>
+                                <div className="flex items-center gap-2">
+                                    <span>{selectedTimeOption.label}</span>
+                                    {selectedTimeOption.isMonthlyChallenge && (
+                                        <span className="px-1.5 py-0.5 rounded text-xs font-bold"
+                                            style={{ 
+                                                background: 'var(--color-success)', 
+                                                color: 'white' 
+                                            }}>
+                                            DESAFIO
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
+                                    <span>{selectedTimeOption.nousReward}</span>
+                                    <ChevronDown size={14} style={{ 
+                                        transition: 'transform 0.2s',
+                                        transform: timeDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                                    }} />
+                                </div>
+                            </button>
+
+                            <AnimatePresence>
+                                {timeDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.15 }}
+                                        style={{ 
+                                            background: '#1a1a2e', 
+                                            border: '1px solid var(--color-border)', 
+                                            borderRadius: '0.75rem',
+                                            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                                            overflow: 'hidden'
+                                        }}>
+                                        <div className="max-h-48 overflow-y-auto">
+                                            {TIME_OPTIONS.map((option) => {
+                                                const isMonthlyChallengeUsed = profile?.challenge_month_used === new Date().toISOString().slice(0, 7);
+                                                const isDisabled = option.isMonthlyChallenge && isMonthlyChallengeUsed;
+                                                const isSelected = selectedTimeOption.hours === option.hours;
+                                                
+                                                return (
+                                                    <button
+                                                        key={option.hours}
+                                                        onClick={() => {
+                                                            if (!isDisabled) {
+                                                                setSelectedTimeOption(option);
+                                                                setTimeDropdownOpen(false);
+                                                            }
+                                                        }}
+                                                        disabled={isDisabled}
+                                                        className="w-full px-3 py-2 text-xs font-black transition-all duration-150 flex items-center justify-between border-b last:border-b-0"
+                                                        style={{
+                                                            background: isSelected 
+                                                                ? '#d4a833' 
+                                                                : '#0f0f23',
+                                                            color: isSelected 
+                                                                ? '#0D0F1C' 
+                                                                : isDisabled 
+                                                                ? 'var(--color-text-muted)' 
+                                                                : 'var(--color-text)',
+                                                            opacity: isDisabled ? 0.5 : 1,
+                                                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                                        }}>
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{option.label}</span>
+                                                            {option.isMonthlyChallenge && (
+                                                                <span className="px-1.5 py-0.5 rounded text-xs font-bold"
+                                                                    style={{ 
+                                                                        background: isDisabled ? 'var(--color-danger)' : 'var(--color-success)', 
+                                                                        color: 'white' 
+                                                                    }}>
+                                                                    {isDisabled ? 'USADO' : 'DESAFIO'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
+                                                            <span>{option.nousReward}</span>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     )}
                 </div>
@@ -326,8 +473,8 @@ function RecallPhase() {
         const res = scoreAnswers(answers.filter(Boolean), words);
         const correct = res.filter(r => r.correct).length;
         const score = correct * (words.length <= 3 ? 50 : words.length <= 9 ? 30 : 20);
-        // Nous ONLY if ALL words correct
-        const nous = correct === words.length ? 15 : 0;
+        // Get the reward from session or fallback to 15 for backward compatibility
+        const nous = correct === words.length ? (session?.nous_reward ?? 15) : 0;
 
         if (correct === words.length) audio.play('success');
         else if (correct >= words.length / 2) audio.play('match');

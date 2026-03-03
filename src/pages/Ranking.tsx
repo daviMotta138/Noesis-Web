@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Trophy, Medal, Star, Crown, Shield } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, Medal, Star, Crown, Shield, UserPlus, X, ChevronLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { PromotionModal } from '../components/PromotionModal';
 import { DemotionModal } from '../components/DemotionModal';
+import { sendPushNotification } from '../lib/notifications';
 
 function getNextSunday20h() {
     const now = new Date();
@@ -48,6 +49,9 @@ export default function RankingPage() {
     const [showDemotionModal, setShowDemotionModal] = useState(false);
     const [promotionData, setPromotionData] = useState<{ from: string; to: string } | null>(null);
     const [demotionData, setDemotionData] = useState<{ from: string; to: string } | null>(null);
+    const [selectedProfile, setSelectedProfile] = useState<RankEntry | null>(null);
+    const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending_sent' | 'pending_received' | 'accepted' | null>(null);
+    const [addingFriend, setAddingFriend] = useState(false);
 
     useEffect(() => {
         const target = getNextSunday20h();
@@ -131,6 +135,76 @@ export default function RankingPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const checkFriendshipStatus = async (targetUserId: string) => {
+        if (!user?.id) return;
+        
+        const { data } = await supabase
+            .from('friendships')
+            .select('*')
+            .or(`and(user_id.eq.${user.id},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${user.id})`)
+            .single();
+
+        if (!data) {
+            setFriendshipStatus('none');
+        } else if (data.status === 'accepted') {
+            setFriendshipStatus('accepted');
+        } else if (data.user_id === user.id) {
+            setFriendshipStatus('pending_sent');
+        } else {
+            setFriendshipStatus('pending_received');
+        }
+    };
+
+    const handleAddFriend = async () => {
+        if (!selectedProfile || !user?.id || addingFriend) return;
+        
+        setAddingFriend(true);
+        
+        try {
+            // Create pending friendship request
+            const { error } = await supabase.from('friendships').insert({
+                user_id: user.id, 
+                friend_id: selectedProfile.id, 
+                status: 'pending',
+            });
+            
+            if (error) throw error;
+
+            // Send notification to the recipient
+            await sendPushNotification('Nova solicitação de amizade!', {
+                body: `${profile?.display_name || 'Alguém'} quer ser seu amigo!`,
+                icon: profile?.avatar_url || '/vite.svg',
+                tag: `friend_request_${user.id}_${selectedProfile.id}`,
+            });
+
+            // Create in-app notification
+            await supabase.from('notifications').insert({
+                user_id: selectedProfile.id,
+                type: 'friend_request',
+                title: 'Nova solicitação de amizade!',
+                body: `${profile?.display_name || 'Alguém'} quer ser seu amigo!`,
+                data: {
+                    sender_id: user.id,
+                    sender_name: profile?.display_name || 'Alguém',
+                    sender_avatar: profile?.avatar_url
+                }
+            });
+
+            setFriendshipStatus('pending_sent');
+        } catch (error) {
+            console.error('Error adding friend:', error);
+        } finally {
+            setAddingFriend(false);
+        }
+    };
+
+    const openProfile = async (entry: RankEntry) => {
+        if (entry.isMe) return; // Don't open profile for self
+        
+        setSelectedProfile(entry);
+        await checkFriendshipStatus(entry.id);
     };
 
     const activeLeagueConfig = LEAGUES.find(l => l.id === tab) || LEAGUES[0];
@@ -263,11 +337,12 @@ export default function RankingPage() {
                             <motion.div key={entry.id}
                                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.03 }}
-                                className="flex items-center justify-between p-2 rounded-full"
+                                className={`flex items-center justify-between p-2 rounded-full ${!entry.isMe ? 'cursor-pointer hover:opacity-80' : ''}`}
                                 style={{
                                     background: entry.isMe ? 'var(--color-glass-strong)' : 'var(--color-glass)',
                                     border: entry.isMe ? '1px solid var(--color-glass-strong)' : '1px solid var(--color-glass)',
-                                }}>
+                                }}
+                                onClick={() => !entry.isMe && openProfile(entry)}>
 
                                 <div className="flex items-center gap-4">
                                     {/* Avatar */}
@@ -321,6 +396,115 @@ export default function RankingPage() {
                     })}
                 </div>
             )}
+            
+            {/* Profile Modal */}
+            <AnimatePresence>
+                {selectedProfile && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-5"
+                        style={{ background: 'rgba(7,8,15,0.85)', backdropFilter: 'blur(8px)' }}
+                        onClick={() => setSelectedProfile(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="w-full max-w-sm rounded-[24px] overflow-hidden"
+                            style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)', boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => setSelectedProfile(null)} style={{ color: 'var(--color-text-muted)' }}>
+                                        <ChevronLeft size={20} />
+                                    </button>
+                                    <p className="font-bold" style={{ color: 'var(--color-text)' }}>Perfil do Jogador</p>
+                                </div>
+                                <button onClick={() => setSelectedProfile(null)} style={{ color: 'var(--color-text-muted)' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            {/* Profile Content */}
+                            <div className="p-6">
+                                {/* Avatar */}
+                                <div className="flex justify-center mb-6">
+                                    <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-4xl shadow-xl overflow-hidden"
+                                        style={{ background: 'var(--color-glass)', border: '2px solid var(--color-border-glow)' }}>
+                                        {selectedProfile.avatar_url ? (
+                                            <img src={selectedProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            getAvatar(selectedProfile.display_name)
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Name and ID */}
+                                <div className="text-center mb-6">
+                                    <h2 className="text-2xl font-black text-display text-gradient-gold mb-1">
+                                        {selectedProfile.display_name}
+                                    </h2>
+                                    <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>{selectedProfile.friend_id}</p>
+                                </div>
+
+                                {/* Stats */}
+                                <div className="grid grid-cols-3 gap-3 mb-6">
+                                    <div className="panel p-3 text-center" style={{ border: '1px solid var(--color-border-glow)' }}>
+                                        <p className="text-lg font-black" style={{ color: 'var(--color-fire)' }}>🔥 {selectedProfile.streak}</p>
+                                        <p className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Ofensiva</p>
+                                    </div>
+                                    <div className="panel p-3 text-center" style={{ border: '1px solid var(--color-border-glow)' }}>
+                                        <p className="text-lg font-black" style={{ color: 'var(--color-text)' }}>{selectedProfile.score.toLocaleString()}</p>
+                                        <p className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Pontos</p>
+                                    </div>
+                                    <div className="panel p-3 text-center" style={{ border: '1px solid var(--color-border-glow)' }}>
+                                        <p className="text-lg font-black text-gradient-gold">{tab}</p>
+                                        <p className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Liga</p>
+                                    </div>
+                                </div>
+
+                                {/* Add Friend Button */}
+                                {friendshipStatus === 'none' && (
+                                    <button
+                                        onClick={handleAddFriend}
+                                        disabled={addingFriend}
+                                        className="btn-gold w-full flex items-center justify-center gap-2"
+                                    >
+                                        <UserPlus size={16} />
+                                        {addingFriend ? 'Enviando...' : 'Adicionar Amigo'}
+                                    </button>
+                                )}
+
+                                {friendshipStatus === 'pending_sent' && (
+                                    <div className="panel p-4 text-center" style={{ background: 'rgba(212,168,83,0.1)', border: '1px solid rgba(212,168,83,0.2)' }}>
+                                        <p className="text-sm font-bold" style={{ color: 'var(--color-gold)' }}>Solicitação enviada</p>
+                                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Aguardando resposta</p>
+                                    </div>
+                                )}
+
+                                {friendshipStatus === 'pending_received' && (
+                                    <div className="panel p-4 text-center" style={{ background: 'rgba(45,212,191,0.1)', border: '1px solid rgba(45,212,191,0.2)' }}>
+                                        <p className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>Quer ser seu amigo!</p>
+                                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Vá para a tela de Amigos para aceitar</p>
+                                    </div>
+                                )}
+
+                                {friendshipStatus === 'accepted' && (
+                                    <div className="panel p-4 text-center" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                                        <p className="text-sm font-bold" style={{ color: 'var(--color-success)' }}>Vocês são amigos!</p>
+                                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Converse na tela de Amigos</p>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

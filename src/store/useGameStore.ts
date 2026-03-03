@@ -6,6 +6,22 @@ import type { User } from '@supabase/supabase-js';
 
 export type GamePhase = 'viewing' | 'waiting' | 'recall' | 'result';
 
+export type TimeOption = {
+    hours: number;
+    nousReward: number;
+    label: string;
+    description: string;
+    isMonthlyChallenge?: boolean;
+};
+
+export const TIME_OPTIONS: TimeOption[] = [
+    { hours: 3, nousReward: 5, label: '3 horas', description: '5 Nous' },
+    { hours: 6, nousReward: 10, label: '6 horas', description: '10 Nous' },
+    { hours: 12, nousReward: 20, label: '12 horas', description: '20 Nous' },
+    { hours: 24, nousReward: 35, label: '24 horas', description: '35 Nous' },
+    { hours: 168, nousReward: 100, label: '1 semana', description: '100 Nous', isMonthlyChallenge: true },
+];
+
 interface GameState {
     // Auth
     user: User | null;
@@ -17,6 +33,7 @@ interface GameState {
     session: DailySession | null;
     phase: GamePhase;
     wordCount: number;
+    selectedTimeOption: TimeOption;
 
     // Local 24h lock tracking
     unlockAt: number | null; // unix ms
@@ -32,6 +49,7 @@ interface GameState {
     setSession: (session: DailySession | null) => void;
     setPhase: (phase: GamePhase) => void;
     setWordCount: (n: number) => void;
+    setSelectedTimeOption: (option: TimeOption) => void;
     setUnlockAt: (ts: number | null) => void;
     setSoundEnabled: (v: boolean) => void;
     setMusicEnabled: (v: boolean) => void;
@@ -43,7 +61,7 @@ interface GameState {
     updateProfile: (patch: Partial<Profile>) => Promise<void>;
     setPendingGift: (gift: any | null) => void;
     checkPendingGifts: () => Promise<void>;
-    startSession: (words: string[]) => Promise<void>;
+    startSession: (words: string[], timeOption: TimeOption) => Promise<void>;
     submitRecall: (answers: string[], score: number, nousEarned: number) => Promise<void>;
     loadActiveSession: (userId: string) => Promise<void>;
 }
@@ -56,6 +74,7 @@ export const useGameStore = create<GameState>()(
             session: null,
             phase: 'viewing',
             wordCount: 3,
+            selectedTimeOption: TIME_OPTIONS[3], // Default to 24 hours
             unlockAt: null,
             soundEnabled: true,
             musicEnabled: false,
@@ -68,6 +87,7 @@ export const useGameStore = create<GameState>()(
             setSession: (session) => set({ session }),
             setPhase: (phase) => set({ phase }),
             setWordCount: (wordCount) => set({ wordCount }),
+            setSelectedTimeOption: (selectedTimeOption) => set({ selectedTimeOption }),
             setUnlockAt: (unlockAt) => set({ unlockAt }),
             setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
             setMusicEnabled: (musicEnabled) => set({ musicEnabled }),
@@ -121,12 +141,25 @@ export const useGameStore = create<GameState>()(
                 if (!error && data) set({ profile: data as Profile });
             },
 
-            startSession: async (words) => {
-                const { user } = get();
+            startSession: async (words, timeOption) => {
+                const { user, profile } = get();
                 if (!user) return;
 
+                // Check monthly challenge availability
+                if (timeOption.isMonthlyChallenge) {
+                    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+                    if (profile?.challenge_month_used === currentMonth) {
+                        throw new Error('Desafio mensal já utilizado este mês');
+                    }
+                    // Mark monthly challenge as used
+                    await supabase
+                        .from('profiles')
+                        .update({ challenge_month_used: currentMonth })
+                        .eq('id', user.id);
+                }
+
                 const now = Date.now();
-                const unlockMs = now + 24 * 60 * 60 * 1000;
+                const unlockMs = now + timeOption.hours * 60 * 60 * 1000;
                 const unlockAt = new Date(unlockMs).toISOString();
 
                 const { data, error } = await supabase
@@ -135,6 +168,8 @@ export const useGameStore = create<GameState>()(
                         user_id: user.id,
                         words,
                         unlocks_at: unlockAt,
+                        time_option: timeOption.hours,
+                        nous_reward: timeOption.nousReward,
                     })
                     .select()
                     .single();
@@ -156,6 +191,7 @@ export const useGameStore = create<GameState>()(
                 const success = score > 0;
                 const currentStreak = profile?.streak ?? 0;
                 const currentShields = profile?.shield_count ?? 0;
+                const nousReward = session.nous_reward ?? 15; // Fallback to 15 for backward compatibility
 
                 await supabase
                     .from('daily_sessions')
@@ -200,7 +236,7 @@ export const useGameStore = create<GameState>()(
                 await supabase
                     .from('profiles')
                     .update({
-                        nous_coins: (profile?.nous_coins ?? 0) + (success ? 15 : 0),
+                        nous_coins: (profile?.nous_coins ?? 0) + (success ? nousReward : 0),
                         score: (profile?.score ?? 0) + score,
                         streak: newStreak,
                         shield_count: newShields,
@@ -241,6 +277,7 @@ export const useGameStore = create<GameState>()(
             // Only persist non-sensitive local state
             partialize: (state) => ({
                 wordCount: state.wordCount,
+                selectedTimeOption: state.selectedTimeOption,
                 unlockAt: state.unlockAt,
                 phase: state.phase,
                 soundEnabled: state.soundEnabled,

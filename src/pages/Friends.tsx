@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Send, Search, Check, X, Users, MessageCircle, ChevronLeft, Gift } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
+import { sendPushNotification } from '../lib/notifications';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
@@ -298,7 +299,7 @@ function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile;
 
 // ─── Main Friends Page ────────────────────────────────────────────────────────
 export default function FriendsPage() {
-    const { user, fetchProfile } = useGameStore();
+    const { user, profile, fetchProfile } = useGameStore();
     const [friends, setFriends] = useState<FriendProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchId, setSearchId] = useState('');
@@ -364,15 +365,79 @@ export default function FriendsPage() {
         if (!searchResult || !user?.id) return;
         const already = friends.find(f => f.id === searchResult.id);
         if (already) { setSearchError('Já é seu amigo ou pedido pendente.'); return; }
-        await supabase.from('friendships').insert({
-            user_id: user.id, friend_id: searchResult.id, status: 'accepted',
+        
+        // Create pending friendship request
+        const { error } = await supabase.from('friendships').insert({
+            user_id: user.id, 
+            friend_id: searchResult.id, 
+            status: 'pending',
         });
-        setSearchResult(null); setSearchId('');
+        
+        if (error) {
+            setSearchError('Erro ao enviar solicitação. Tente novamente.');
+            return;
+        }
+
+        // Send notification to the recipient
+        await sendPushNotification('Nova solicitação de amizade!', {
+            body: `${profile?.display_name || 'Alguém'} quer ser seu amigo!`,
+            icon: profile?.avatar_url || '/vite.svg',
+            tag: `friend_request_${user.id}_${searchResult.id}`,
+        });
+
+        // Create in-app notification
+        await supabase.from('notifications').insert({
+            user_id: searchResult.id,
+            type: 'friend_request',
+            title: 'Nova solicitação de amizade!',
+            body: `${profile?.display_name || 'Alguém'} quer ser seu amigo!`,
+            data: {
+                sender_id: user.id,
+                sender_name: profile?.display_name || 'Alguém',
+                sender_avatar: profile?.avatar_url
+            }
+        });
+
+        setSearchResult(null); 
+        setSearchId('');
         fetchFriends();
     };
 
     const handleAccept = async (friendshipId: string) => {
-        await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+        // Get friendship details to find who sent the request
+        const { data: friendship } = await supabase
+            .from('friendships')
+            .select('user_id, friend_id')
+            .eq('id', friendshipId)
+            .single();
+
+        if (friendship) {
+            // Update status to accepted
+            await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+
+            // Send notification to the person who sent the request
+            const senderId = friendship.user_id === user?.id ? friendship.friend_id : friendship.user_id;
+            
+            await sendPushNotification('Solicitação de amizade aceita!', {
+                body: `${profile?.display_name || 'Alguém'} aceitou sua solicitação de amizade!`,
+                icon: profile?.avatar_url || '/vite.svg',
+                tag: `friend_accepted_${user?.id}_${senderId}`,
+            });
+
+            // Create in-app notification
+            await supabase.from('notifications').insert({
+                user_id: senderId,
+                type: 'friend_accepted',
+                title: 'Solicitação de amizade aceita!',
+                body: `${profile?.display_name || 'Alguém'} aceitou sua solicitação de amizade!`,
+                data: {
+                    friend_id: user?.id,
+                    friend_name: profile?.display_name || 'Alguém',
+                    friend_avatar: profile?.avatar_url
+                }
+            });
+        }
+
         fetchFriends();
     };
 

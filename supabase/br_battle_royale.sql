@@ -175,7 +175,9 @@ create or replace function start_br_match(p_match_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
+-- include pg_catalog to ensure extensions are visible
+set search_path = public, pg_catalog
+-- pgcrypto extension functions are created in public schema
 as $$
 declare
   v_rows int; v_cols int; v_count int; v_seed text; i int;
@@ -191,7 +193,7 @@ begin
   for i in 0..(v_count-1) loop
     -- value_index: floor(i/2) so each pair shares same value_hash
     insert into br_cards(match_id, idx, value_hash)
-    values (p_match_id, i, encode(digest(v_seed || '|' || floor(i/2)::text, 'sha256'::text), 'hex'::text));
+    values (p_match_id, i, encode(digest((v_seed || '|' || floor(i/2)::text)::bytea, 'sha256'), 'hex'));
   end loop;
 
   insert into br_events(match_id, event_type, payload) 
