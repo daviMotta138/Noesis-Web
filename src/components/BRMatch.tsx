@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/useGameStore';
 import { useMatchStore } from '../store/useMatchStore';
+import type { BRPlayer, BRCard } from '../store/useMatchStore';
 
 interface BRMatchProps {
   matchId: string;
@@ -56,9 +57,9 @@ export default function BRMatch({ matchId, onMatchEnd }: BRMatchProps) {
     };
   }, [matchId, user?.id]);
 
-  const currentPlayer = players.find(p => p.is_current_turn);
+  const currentPlayer = players.find((p: BRPlayer) => p.is_current_turn);
   const isMyTurn = currentPlayer?.id === user?.id;
-  const sortedPlayers = [...players].sort((a, b) => b.total_score - a.total_score);
+  const sortedPlayers = [...players].sort((a: BRPlayer, b: BRPlayer) => b.total_score - a.total_score);
 
   // Handle card flip
   const handleCardFlip = async (idx: number) => {
@@ -194,7 +195,7 @@ export default function BRMatch({ matchId, onMatchEnd }: BRMatchProps) {
               gap: '0.75rem'
             }}
           >
-            {cards.map((card, idx) => (
+            {cards.map((card: BRCard, idx: number) => (
               <motion.button
                 key={idx}
                 onClick={() => handleCardFlip(idx)}

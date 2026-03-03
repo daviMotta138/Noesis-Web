@@ -83,6 +83,7 @@ alter table br_players enable row level security;
 alter table br_cards enable row level security;
 alter table br_events enable row level security;
 alter table br_queue enable row level security; -- allow RLS on queue
+alter table br_invites enable row level security; -- allow RLS on invites
 
 -- ensure old policies are removed
 drop policy if exists "public_select_matches" on br_matches;
@@ -104,6 +105,10 @@ create policy "cards_select_authenticated" on br_cards for select using (auth.ro
 create policy "events_select_authenticated" on br_events for select using (auth.role() = 'authenticated');
 
 create policy "queue_select_authenticated" on br_queue for select using (auth.role() = 'authenticated');
+
+-- invites should also be visible to authenticated users
+create policy "invites_select_authenticated" on br_invites for select using (auth.role() = 'authenticated');
+create policy "invites_insert_authenticated" on br_invites for insert using (auth.role() = 'authenticated');
 
 -- RPCs / Functions
 
@@ -202,6 +207,7 @@ declare
   v_match uuid;
   v_count int;
   v_needed int;
+  rec record;
 begin
   -- ensure user not already queued
   delete from br_queue where user_id = p_user_id;
@@ -239,6 +245,52 @@ end;
 $$;
 
 grant execute on function leave_queue(uuid) to authenticated, service_role;
+
+-- create_invite(match_id, ttl_seconds)
+create or replace function create_br_invite(p_match_id uuid, p_ttl integer default 30)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_token text := gen_random_uuid()::text;
+begin
+  insert into br_invites(match_id, token, expires_at)
+  values (p_match_id, v_token, now() + (p_ttl || ' seconds')::interval);
+  return v_token;
+end;
+$$;
+
+grant execute on function create_br_invite(uuid, integer) to authenticated, service_role;
+
+-- join by invite token
+create or replace function join_br_match_by_token(p_token text, p_user_id uuid, p_display_name text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_match uuid;
+  v_status text;
+  v_player uuid;
+begin
+  select match_id into v_match from br_invites where token = p_token and expires_at > now();
+  if v_match is null then
+    raise exception 'invalid_or_expired_token';
+  end if;
+  select status into v_status from br_matches where id = v_match;
+  if v_status <> 'waiting' then
+    raise exception 'match_not_open';
+  end if;
+  v_player := join_br_match(v_match, p_user_id, p_display_name, false);
+  return jsonb_build_object('match_id', v_match, 'player_id', v_player);
+end;
+$$;
+
+grant execute on function join_br_match_by_token(text, uuid, text) to authenticated, service_role;
+
 create or replace function advance_turn(p_match_id uuid)
 returns uuid
 language plpgsql
