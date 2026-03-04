@@ -77,7 +77,7 @@ function ViewingPhase() {
     };
 
     return (
-        <div className="flex flex-col min-h-screen pb-24 max-w-lg mx-auto w-full">
+        <div className="flex flex-col min-h-screen pb-24 max-w-5xl mx-auto w-full">
             {/* Header */}
             <div className="px-5 pt-10 pb-6">
                 <div className="flex items-start justify-between">
