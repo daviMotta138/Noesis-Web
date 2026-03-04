@@ -103,8 +103,8 @@ function ViewingPhase() {
 
             {/* Fortnite-style Banners Carousel */}
             {banners.length > 0 && !flipped && (
-                <div className="mb-6 px-5 relative z-10 w-full max-w-sm mx-auto sm:max-w-none">
-                    <div className="relative w-full aspect-[21/9] sm:aspect-[21/9] md:aspect-[32/9] overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg"
+                <div className="mb-6 px-5 relative z-10 w-full max-w-sm mx-auto md:max-w-xl">
+                    <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg"
                         style={{ background: 'var(--color-card)' }}>
                         <AnimatePresence mode="popLayout">
                             <motion.div
