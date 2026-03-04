@@ -1,190 +1,198 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Play, Pause, SkipForward, SkipBack } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
-// Singleton to hold the current playlist across components safely
+// ── Singleton audio element & playlist ───────────────────────────────────────
 let CURRENT_PLAYLIST: any[] = [];
+let GLOBAL_IDX = 0; // tracks current index globally
 
-// Helper to shuffle array (Fisher-Yates)
-const shuffleArray = (array: any[]) => {
-    const newArr = [...array];
-    for (let i = newArr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+function getAudio(): HTMLAudioElement {
+    let el = document.getElementById('noesis-native-audio') as HTMLAudioElement;
+    if (!el) {
+        el = document.createElement('audio');
+        el.id = 'noesis-native-audio';
+        el.volume = 0.25;
+        document.body.appendChild(el);
     }
-    return newArr;
-};
+    return el;
+}
 
+function shuffleArray(array: any[]) {
+    const a = [...array];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ── Absolute URL helper for MediaSession artwork ──────────────────────────────
+function absoluteUrl(url: string): string {
+    if (!url) return `${window.location.origin}/logo-noesis.png`;
+    if (url.startsWith('http')) return url;
+    return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+// ── Apply MediaSession metadata + playback state ──────────────────────────────
+function applyMediaSession(track: any, playing: boolean, onNext: () => void, onPrev: () => void) {
+    if (!('mediaSession' in navigator)) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title || 'Noesis Music',
+        artist: track.artist || 'Noesis',
+        album: 'Palácio da Memória',
+        artwork: [
+            { src: absoluteUrl(track.thumb), sizes: '512x512', type: 'image/png' },
+            { src: absoluteUrl(track.thumb), sizes: '256x256', type: 'image/png' },
+        ],
+    });
+
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+
+    const audio = getAudio();
+    navigator.mediaSession.setActionHandler('play', () => {
+        audio.play().catch(() => { });
+        useGameStore.getState().setMusicEnabled(true);
+        navigator.mediaSession.playbackState = 'playing';
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+        audio.pause();
+        useGameStore.getState().setMusicEnabled(false);
+        navigator.mediaSession.playbackState = 'paused';
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', onNext);
+    navigator.mediaSession.setActionHandler('previoustrack', onPrev);
+    navigator.mediaSession.setActionHandler('stop', () => {
+        audio.pause();
+        useGameStore.getState().setMusicEnabled(false);
+        navigator.mediaSession.playbackState = 'paused';
+    });
+}
+
+// ── Load and play a track by index ───────────────────────────────────────────
+function loadTrack(idx: number, autoplay: boolean, onNext: () => void, onPrev: () => void) {
+    if (CURRENT_PLAYLIST.length === 0) return;
+    const track = CURRENT_PLAYLIST[idx];
+    const audio = getAudio();
+    audio.src = track.url;
+    audio.load();
+    if (autoplay) {
+        audio.play().catch(() => { });
+    }
+    window.dispatchEvent(new CustomEvent('audio-meta', { detail: track }));
+    applyMediaSession(track, autoplay, onNext, onPrev);
+}
+
+// ── MusicPlayer (logic only, no UI) ──────────────────────────────────────────
 export const MusicPlayer = () => {
-    const { musicEnabled, setMusicEnabled } = useGameStore();
+    const { musicEnabled } = useGameStore();
+    const idxRef = useRef(0);
+    const initializedRef = useRef(false);
 
+    const handleNext = () => {
+        if (CURRENT_PLAYLIST.length === 0) return;
+        idxRef.current = (idxRef.current + 1) % CURRENT_PLAYLIST.length;
+        GLOBAL_IDX = idxRef.current;
+        loadTrack(idxRef.current, useGameStore.getState().musicEnabled, handleNext, handlePrev);
+    };
+
+    const handlePrev = () => {
+        if (CURRENT_PLAYLIST.length === 0) return;
+        idxRef.current = (idxRef.current - 1 + CURRENT_PLAYLIST.length) % CURRENT_PLAYLIST.length;
+        GLOBAL_IDX = idxRef.current;
+        loadTrack(idxRef.current, useGameStore.getState().musicEnabled, handleNext, handlePrev);
+    };
+
+    // ── Init: fetch playlist once ─────────────────────────────────────────
     useEffect(() => {
-        const initializeAudio = async () => {
-            // First time load: fetch from Supabase
-            const { data } = await supabase.from('music_tracks').select('*').order('created_at', { ascending: false });
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
+        supabase.from('music_tracks').select('*').order('created_at', { ascending: false }).then(({ data }) => {
             if (data && data.length > 0) {
                 CURRENT_PLAYLIST = shuffleArray(data);
-            } else {
-                CURRENT_PLAYLIST = [];
             }
-
-            // Do not initialize audio element if there's no music to play
             if (CURRENT_PLAYLIST.length === 0) return;
 
-            let audio = document.getElementById('noesis-native-audio') as HTMLAudioElement;
+            // Attach ended listener directly — no setTimeout race condition
+            const audio = getAudio();
+            audio.addEventListener('ended', handleNext);
 
-            if (!audio) {
-                audio = document.createElement('audio');
-                audio.id = 'noesis-native-audio';
-                audio.volume = 0.25;
-                audio.src = CURRENT_PLAYLIST[0].url;
-                document.body.appendChild(audio);
+            // Load first track
+            idxRef.current = GLOBAL_IDX;
+            loadTrack(idxRef.current, useGameStore.getState().musicEnabled, handleNext, handlePrev);
+        });
 
-                setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('audio-meta', { detail: CURRENT_PLAYLIST[0] }));
-                }, 500);
-            }
-
-            if (musicEnabled) {
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.warn("Autoplay preventing bg music:", error);
-
-                        // Fallback: wait for the first click to try again
-                        const resumeAudio = () => {
-                            if (useGameStore.getState().musicEnabled) {
-                                audio.play().catch(() => { });
-                            }
-                            document.removeEventListener('pointerdown', resumeAudio);
-                            document.removeEventListener('keydown', resumeAudio);
-                        };
-                        document.addEventListener('pointerdown', resumeAudio, { once: true });
-                        document.addEventListener('keydown', resumeAudio, { once: true });
-                    });
-                }
-            } else {
-                audio.pause();
-            }
-        };
-
-        initializeAudio();
-    }, [musicEnabled, setMusicEnabled]);
-
-    useEffect(() => {
-        let currentIdx = 0;
-        const audio = document.getElementById('noesis-native-audio') as HTMLAudioElement;
-
-        const loadTrack = (idx: number) => {
-            if (!audio || CURRENT_PLAYLIST.length === 0) return;
-            const track = CURRENT_PLAYLIST[idx];
-            audio.src = track.url;
-            if (useGameStore.getState().musicEnabled) {
-                audio.play().catch(() => { });
-            }
-            window.dispatchEvent(new CustomEvent('audio-meta', { detail: track }));
-        };
-
-        const handleNext = () => {
-            if (CURRENT_PLAYLIST.length === 0) return;
-            currentIdx = (currentIdx + 1) % CURRENT_PLAYLIST.length;
-            loadTrack(currentIdx);
-        };
-
-        const handlePrev = () => {
-            if (CURRENT_PLAYLIST.length === 0) return;
-            currentIdx = (currentIdx - 1 + CURRENT_PLAYLIST.length) % CURRENT_PLAYLIST.length;
-            loadTrack(currentIdx);
-        };
-
-        const handleEnded = () => handleNext();
-
-        window.addEventListener('audio-next', handleNext);
-        window.addEventListener('audio-prev', handlePrev);
-
-        // Wait briefly for element creation just in case
-        setTimeout(() => {
-            const el = document.getElementById('noesis-native-audio') as HTMLAudioElement;
-            if (el && CURRENT_PLAYLIST.length > 0) el.addEventListener('ended', handleEnded);
-        }, 1000);
+        // Window events for UI buttons
+        const onNext = () => handleNext();
+        const onPrev = () => handlePrev();
+        window.addEventListener('audio-next', onNext);
+        window.addEventListener('audio-prev', onPrev);
 
         return () => {
-            window.removeEventListener('audio-next', handleNext);
-            window.removeEventListener('audio-prev', handlePrev);
-            if (audio) audio.removeEventListener('ended', handleEnded);
+            window.removeEventListener('audio-next', onNext);
+            window.removeEventListener('audio-prev', onPrev);
+            const audio = document.getElementById('noesis-native-audio') as HTMLAudioElement;
+            if (audio) audio.removeEventListener('ended', handleNext);
+        };
+    }, []); // run once
+
+    // ── Sync play/pause state with store ─────────────────────────────────
+    useEffect(() => {
+        const audio = document.getElementById('noesis-native-audio') as HTMLAudioElement;
+        if (!audio || CURRENT_PLAYLIST.length === 0) return;
+        if (musicEnabled) {
+            audio.play().catch(() => { });
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+        } else {
+            audio.pause();
+            if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
         }
-    }, []);
+    }, [musicEnabled]);
 
     return null;
 };
 
+// ── MusicPlayerUI (visual widget) ────────────────────────────────────────────
 export const MusicPlayerUI = ({ className = '', fullWidth = false }: { className?: string, fullWidth?: boolean }) => {
     const { musicEnabled, setMusicEnabled } = useGameStore();
-    const [trackName, setTrackName] = useState('Sem Faixas Disponíveis');
-    const [artist, setArtist] = useState('...');
-    const [thumb, setThumb] = useState('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=100&auto=format&fit=crop');
+    const [trackName, setTrackName] = useState('Carregando...');
+    const [artist, setArtist] = useState('Noesis Radio');
+    const [thumb, setThumb] = useState('/logo-noesis.png');
 
     useEffect(() => {
         const handleMeta = (e: Event) => {
-            const detail = (e as CustomEvent).detail;
-            if (detail.title) setTrackName(detail.title);
-            if (detail.artist) setArtist(detail.artist);
-            if (detail.thumb) setThumb(detail.thumb);
+            const d = (e as CustomEvent).detail;
+            if (d.title) setTrackName(d.title);
+            if (d.artist) setArtist(d.artist);
+            if (d.thumb) setThumb(d.thumb);
         };
         window.addEventListener('audio-meta', handleMeta);
 
-        // Sync local UI directly with the current track on mount
-        const audio = document.getElementById('noesis-native-audio') as HTMLAudioElement;
-
+        // Sync on mount from current track
         if (CURRENT_PLAYLIST.length > 0) {
-            if (audio && audio.src) {
-                const track = CURRENT_PLAYLIST.find(p => p.url === audio.src) || CURRENT_PLAYLIST[0];
-                setTrackName(track.title);
-                setArtist(track.artist);
-                setThumb(track.thumb);
-            } else {
-                setTrackName(CURRENT_PLAYLIST[0].title);
-                setArtist(CURRENT_PLAYLIST[0].artist);
-                setThumb(CURRENT_PLAYLIST[0].thumb);
-            }
-        } else {
-            setTrackName('Sem Faixas Disponíveis');
-            setArtist('...');
+            const track = CURRENT_PLAYLIST[GLOBAL_IDX] || CURRENT_PLAYLIST[0];
+            setTrackName(track.title || 'Noesis Music');
+            setArtist(track.artist || 'Noesis');
+            setThumb(track.thumb || '/logo-noesis.png');
         }
 
         return () => window.removeEventListener('audio-meta', handleMeta);
     }, []);
 
-    const handleNext = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        window.dispatchEvent(new Event('audio-next'));
-    };
-
-    const handlePrev = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        window.dispatchEvent(new Event('audio-prev'));
-    };
-
-    const togglePlay = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setMusicEnabled(!musicEnabled);
-    };
+    const next = (e: React.MouseEvent) => { e.stopPropagation(); window.dispatchEvent(new Event('audio-next')); };
+    const prev = (e: React.MouseEvent) => { e.stopPropagation(); window.dispatchEvent(new Event('audio-prev')); };
+    const togglePlay = (e: React.MouseEvent) => { e.stopPropagation(); setMusicEnabled(!musicEnabled); };
 
     return (
         <div className={className}>
-
-            {/* UI Widget following Site Palette */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex items-center rounded-[20px] overflow-hidden shadow-2xl ${fullWidth ? 'w-full' : 'w-[280px]'}`}
-                style={{
-                    background: 'var(--color-card)',
-                    border: '1px solid var(--color-border-glow)',
-                    height: 64,
-                }}
+                style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)', height: 64 }}
             >
                 {/* Album Art */}
                 <div className="w-16 h-16 bg-black flex-shrink-0 relative">
@@ -194,29 +202,21 @@ export const MusicPlayerUI = ({ className = '', fullWidth = false }: { className
 
                 {/* Track Info */}
                 <div className="flex-1 px-3 py-1 flex flex-col justify-center min-w-0">
-                    <p className="text-xs font-bold leading-tight truncate" style={{ color: 'var(--color-text)' }}>
-                        {trackName}
-                    </p>
-                    <p className="text-[10px] font-medium truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                        {artist}
-                    </p>
+                    <p className="text-xs font-bold leading-tight truncate" style={{ color: 'var(--color-text)' }}>{trackName}</p>
+                    <p className="text-[10px] font-medium truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{artist}</p>
                 </div>
 
                 {/* Controls */}
                 <div className="flex items-center pr-3 gap-1">
-                    <button onClick={handlePrev} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--color-text-muted)' }}>
+                    <button onClick={prev} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--color-text-muted)' }}>
                         <SkipBack size={16} fill="currentColor" />
                     </button>
-
-                    <button
-                        onClick={togglePlay}
+                    <button onClick={togglePlay}
                         className="w-8 h-8 rounded-full flex items-center justify-center transition-transform active:scale-95 shadow"
-                        style={{ background: 'var(--color-gold)', color: '#000' }}
-                    >
+                        style={{ background: 'var(--color-gold)', color: '#000' }}>
                         {musicEnabled ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-1" />}
                     </button>
-
-                    <button onClick={handleNext} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--color-text-muted)' }}>
+                    <button onClick={next} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: 'var(--color-text-muted)' }}>
                         <SkipForward size={16} fill="currentColor" />
                     </button>
                 </div>

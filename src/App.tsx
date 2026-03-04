@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from './lib/supabase';
@@ -19,25 +19,62 @@ import Layout from './components/Layout';
 import PlaygroundPage from './pages/Playground';
 import BattleRoyalePage from './pages/BattleRoyale';
 import { ChangelogModal } from './components/ChangelogModal';
+import HorizontalCanvas, { CANVAS_ROUTES } from './components/HorizontalCanvas';
+import { initCapacitorNotifications } from './lib/notifications';
+import SplashLoader from './components/SplashLoader';
 
+// ── Inline fade-wrapper ──────────────────────────────────────────────────────
+function Fade({ children }: { children: React.ReactNode }) {
+  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{children}</motion.div>;
+}
+
+// ── Mobile detection (Horizontal Canvas only on mobile) ─────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler, { passive: true });
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
+// ── Routes ───────────────────────────────────────────────────────────────────
 function AnimatedRoutes() {
   const location = useLocation();
+  const isMobile = useIsMobile();
+  const isCanvasRoute = CANVAS_ROUTES.includes(location.pathname as any);
+
+  // Mobile: canvas routes use HorizontalCanvas swipe navigation
+  if (isCanvasRoute && isMobile) {
+    return (
+      <Layout isCanvas>
+        <HorizontalCanvas>
+          <div className="min-h-[100dvh] pb-20 overflow-y-auto"><HomePage /></div>
+          <div className="min-h-[100dvh] pb-20 overflow-y-auto"><RankingPage /></div>
+          <div className="min-h-[100dvh] pb-20 overflow-y-auto"><ProfilePage /></div>
+        </HorizontalCanvas>
+      </Layout>
+    );
+  }
+
+  // Desktop (or non-canvas route): standard Layout + Outlet routing
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route element={<Layout />}>
-          <Route path="/" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><HomePage /></motion.div>} />
-          <Route path="/ranking" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RankingPage /></motion.div>} />
-          <Route path="/friends" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><FriendsPage /></motion.div>} />
-          <Route path="/shop" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ShopPage /></motion.div>} />
-          <Route path="/profile" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ProfilePage /></motion.div>} />
-          <Route path="/nous" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><NousStorePage /></motion.div>} />
-          <Route path="/streak" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><StreakPage /></motion.div>} />
-          <Route path="/admin" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><AdminPage /></motion.div>} />
-          <Route path="/notifications" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><NotificationsPage /></motion.div>} />
-          <Route path="/settings" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SettingsPage /></motion.div>} />
-          <Route path="/playground" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlaygroundPage /></motion.div>} />
-          <Route path="/battle-royale" element={<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BattleRoyalePage /></motion.div>} />
+          <Route path="/" element={<Fade><HomePage /></Fade>} />
+          <Route path="/ranking" element={<Fade><RankingPage /></Fade>} />
+          <Route path="/profile" element={<Fade><ProfilePage /></Fade>} />
+          <Route path="/friends" element={<Fade><FriendsPage /></Fade>} />
+          <Route path="/shop" element={<Fade><ShopPage /></Fade>} />
+          <Route path="/nous" element={<Fade><NousStorePage /></Fade>} />
+          <Route path="/streak" element={<Fade><StreakPage /></Fade>} />
+          <Route path="/admin" element={<Fade><AdminPage /></Fade>} />
+          <Route path="/notifications" element={<Fade><NotificationsPage /></Fade>} />
+          <Route path="/settings" element={<Fade><SettingsPage /></Fade>} />
+          <Route path="/playground" element={<Fade><PlaygroundPage /></Fade>} />
+          <Route path="/battle-royale" element={<Fade><BattleRoyalePage /></Fade>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -47,41 +84,74 @@ function AnimatedRoutes() {
 
 export default function App() {
   const { user, setUser, fetchProfile } = useGameStore();
+  // authReady: true once we know the session state (null or user) — hides splash
+  const [authReady, setAuthReady] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUser(session.user); fetchProfile(session.user.id); }
+    let profileDone = false;
+
+    // Fetch session + profile in parallel (avoids sequential await chain)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        // Fire profile fetch without blocking — mark ready after it resolves
+        fetchProfile(session.user.id).finally(() => {
+          profileDone = true;
+          setAuthReady(true);
+        });
+      } else {
+        setAuthReady(true); // No user, show auth page immediately
+      }
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      if (u) fetchProfile(u.id);
+      if (u) {
+        if (!profileDone) {
+          fetchProfile(u.id).finally(() => setAuthReady(true));
+        }
+        initCapacitorNotifications().catch(console.warn);
+      } else {
+        setAuthReady(true);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, [setUser, fetchProfile]);
 
-  const content = !user ? (
-    <AnimatePresence mode="wait">
-      <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.5 }}>
-        <AuthPage />
-      </motion.div>
-    </AnimatePresence>
-  ) : (
-    <AnimatePresence mode="wait">
-      <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
-        <BrowserRouter>
-          <ChangelogModal />
-          <AnimatedRoutes />
-        </BrowserRouter>
-      </motion.div>
-    </AnimatePresence>
-  );
+  const handleSplashFinish = useCallback(() => setSplashDone(true), []);
+
+  const showSplash = !splashDone;
 
   return (
     <div className="min-h-screen relative w-full text-white bg-transparent">
       <StarBackground interactive={!user} />
+
+      {/* ── Boot Splash — overlays everything until auth+profile ready ── */}
+      {showSplash && (
+        <SplashLoader isReady={authReady} onFinish={handleSplashFinish} />
+      )}
+
+      {/* ── App content — renders behind splash until splashDone ── */}
       <div className="relative z-10 w-full min-h-screen">
-        {content}
+        {splashDone && (
+          <AnimatePresence mode="wait">
+            {!user ? (
+              <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.5 }}>
+                <AuthPage />
+              </motion.div>
+            ) : (
+              <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+                <BrowserRouter>
+                  <ChangelogModal />
+                  <AnimatedRoutes />
+                </BrowserRouter>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
       </div>
     </div>
   );

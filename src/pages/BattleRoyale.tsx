@@ -1,14 +1,14 @@
 // src/pages/BattleRoyale.tsx — Complete Memory Battle Royale
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Trophy, Swords, Users, UserPlus, Crown, Zap,
-  Copy, Check, ArrowLeft, Loader2, Bot, Flame,
-  Star, X, Shield
+  Swords, Users, UserPlus, Zap,
+  Copy, Check, ArrowLeft, Loader2, Bot,
+  X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
-import { useMatchStore, type BRPlayer, type BRCard } from '../store/useMatchStore';
+import { useMatchStore, type BRPlayer } from '../store/useMatchStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const BOT_NAMES = ['NeuroBot', 'CortexAI', 'SynapsX', 'AxonBot', 'DendriAI', 'GliaBot', 'MyelBot', 'ThalamBot'];
@@ -30,6 +30,18 @@ function getComboMultiplier(hits: number): number {
 function getEmoji(name: string) {
   const emojis = ['🦁', '🐺', '🦊', '🐻', '🦅', '🐯', '🦋', '🐼', '⚡', '🌟'];
   return emojis[(name || 'A').charCodeAt(0) % emojis.length];
+}
+
+// Safe UUID generator that works in HTTP (non-secure) contexts
+function makeUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts (local HTTP dev)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
 
 type Screen = 'home' | 'queue' | 'lobby' | 'game' | 'podium';
@@ -324,6 +336,9 @@ export default function BattleRoyalePage() {
   }, [match?.status]);
 
   // ─── Matchmaking ─────────────────────────────────────────────────────────
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fillRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const joinQuickPlay = async () => {
     if (!user?.id) return;
     setError(null);
@@ -331,44 +346,53 @@ export default function BattleRoyalePage() {
     try {
       const result = await useMatchStore.getState().enqueueQueue(user.id, displayName);
       if (result?.match_id) {
-        // we got a match immediately
+        // Supabase already matched us with existing queue players
         await enterMatch(result.match_id);
       } else {
         setQueueCount(result?.queue_count || 1);
-        pollQueue();
+        startQueuePolling();
+        // After 15s: fill with bots and start regardless
+        fillRef.current = setTimeout(async () => {
+          stopQueuePolling();
+          await fillAndStart();
+        }, 15000);
       }
     } catch (e: any) { setError(e.message); setScreen('home'); }
   };
 
-  const pollQueue = useCallback(() => {
-    let attempts = 0;
-    const poll = setInterval(async () => {
-      attempts++;
+  const startQueuePolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
       try {
-        const { data } = await supabase.from('br_queue').select('count').single();
-        const count = (data as any)?.count || 1;
-        setQueueCount(count);
-        // fill with bots after 30s
-        if (attempts >= 30) {
-          clearInterval(poll);
-          await fillAndStart();
+        // Check if the queue RPC now has enough for a match (4 players)
+        const result = await useMatchStore.getState().enqueueQueue(user!.id, displayName);
+        if (result?.match_id) {
+          stopQueuePolling();
+          if (fillRef.current) clearTimeout(fillRef.current);
+          await enterMatch(result.match_id);
+        } else {
+          setQueueCount(result?.queue_count || 1);
         }
-      } catch { clearInterval(poll); }
-    }, 1000);
-    return () => clearInterval(poll);
-  }, []);
+      } catch { /* keep polling */ }
+    }, 3000);
+  };
+
+  const stopQueuePolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
 
   const fillAndStart = async () => {
+    // remove user from queue first so they don't re-match
+    try { await useMatchStore.getState().leaveQueue(user!.id); } catch { /* ok */ }
     const matchId = await useMatchStore.getState().createMatch(user!.id, 4, 4, 6);
     const pid = await useMatchStore.getState().joinMatch(matchId, user!.id, displayName);
     setMyPlayerId(pid);
     const botsNeeded = 4 - 1;
     for (let i = 0; i < botsNeeded; i++) {
-      await useMatchStore.getState().joinMatch(matchId, crypto.randomUUID(), BOT_NAMES[i] || 'Bot', true);
+      await useMatchStore.getState().joinMatch(matchId, makeUUID(), BOT_NAMES[i] || 'Bot', true);
     }
     await useMatchStore.getState().startMatch(matchId);
     await useMatchStore.getState().getMatchState(matchId, pid);
-    setScreen('game');
   };
 
   const enterMatch = async (matchId: string) => {
@@ -453,13 +477,15 @@ export default function BattleRoyalePage() {
     if (current < 2) { setError('Mínimo 2 jogadores para iniciar!'); return; }
     const needed = 4 - current;
     for (let i = 0; i < needed; i++) {
-      await useMatchStore.getState().joinMatch(match.id, crypto.randomUUID(), BOT_NAMES[i] || 'Bot', true);
+      await useMatchStore.getState().joinMatch(match.id, makeUUID(), BOT_NAMES[i] || 'Bot', true);
     }
     await useMatchStore.getState().startMatch(match.id);
     await useMatchStore.getState().getMatchState(match.id, myPlayerId);
   };
 
   const goHome = () => {
+    stopQueuePolling();
+    if (fillRef.current) clearTimeout(fillRef.current);
     reset();
     setScreen('home');
     setMyPlayerId(null);
@@ -749,7 +775,6 @@ export default function BattleRoyalePage() {
   if (screen !== 'game') return null;
 
   const cols = match?.grid_cols || 6;
-  const rows = match?.grid_rows || 4;
   const isEliminated = me?.status === 'eliminated';
 
   return (

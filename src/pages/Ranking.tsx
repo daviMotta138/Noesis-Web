@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Medal, Star, Crown, Shield, UserPlus, Check, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -40,6 +42,7 @@ const LEAGUES = [
 
 export default function RankingPage() {
     const { user, profile } = useGameStore();
+    const location = useLocation();
     const [tab, setTab] = useState<string>(profile?.league || 'Bronze');
     const [data, setData] = useState<RankEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -51,6 +54,9 @@ export default function RankingPage() {
     const [selectedPlayer, setSelectedPlayer] = useState<RankEntry | null>(null);
     const [friendStatus, setFriendStatus] = useState<'none' | 'pending_sent' | 'accepted'>('none');
     const [addingFriend, setAddingFriend] = useState(false);
+
+    // Close panel when navigating away
+    useEffect(() => { setSelectedPlayer(null); }, [location.pathname]);
 
     useEffect(() => {
         const target = getNextSunday20h();
@@ -157,7 +163,7 @@ export default function RankingPage() {
                 .select('status, user_id')
                 .or(`and(user_id.eq.${user.id},friend_id.eq.${entry.id}),and(user_id.eq.${entry.id},friend_id.eq.${user.id})`)
                 .limit(1)
-                .single();
+                .maybeSingle();
             if (fs) {
                 setFriendStatus(fs.status === 'accepted' ? 'accepted' : 'pending_sent');
             }
@@ -183,92 +189,114 @@ export default function RankingPage() {
 
     return (
         <div className="min-h-screen pb-24">
-            {/* Player Profile Modal */}
-            <AnimatePresence>
-                {selectedPlayer && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex items-end md:items-center md:justify-center"
-                        style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
-                        onClick={() => setSelectedPlayer(null)}
-                    >
+            {/* Player Profile Modal — portal escapes the canvas CSS-transform containing block */}
+            {createPortal(
+                <AnimatePresence>
+                    {selectedPlayer && (
                         <motion.div
-                            initial={{ y: 60, opacity: 0, scale: 0.97 }}
-                            animate={{ y: 0, opacity: 1, scale: 1 }}
-                            exit={{ y: 60, opacity: 0, scale: 0.97 }}
-                            onClick={e => e.stopPropagation()}
-                            className="w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl p-6"
-                            style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)' }}
+                            key="profile-overlay"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                width: '100vw',
+                                height: '100dvh',
+                                zIndex: 9998,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'rgba(0,0,0,0.82)',
+                                backdropFilter: 'blur(8px)',
+                                WebkitBackdropFilter: 'blur(8px)',
+                            }}
+                            onClick={() => setSelectedPlayer(null)}
                         >
-                            <div className="flex items-start gap-4 mb-5">
-                                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl overflow-hidden flex-shrink-0"
-                                    style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                    {selectedPlayer.avatar_url ? (
-                                        <img src={selectedPlayer.avatar_url} alt="" className="w-full h-full object-cover" />
-                                    ) : getAvatar(selectedPlayer.display_name)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h2 className="text-xl font-black text-gradient-gold truncate">{selectedPlayer.display_name}</h2>
-                                    <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{selectedPlayer.league} · #{selectedPlayer.friend_id}</p>
-                                    <div className="flex gap-3 mt-2">
-                                        <span className="text-xs font-bold" style={{ color: 'var(--color-gold)' }}>{selectedPlayer.score} pts</span>
-                                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>🔥 {selectedPlayer.streak} dias</span>
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                                onClick={e => e.stopPropagation()}
+                                className="w-[calc(100vw-2rem)] max-w-sm rounded-3xl p-6"
+                                style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)' }}
+                            >
+                                <div className="flex items-start gap-4 mb-5">
+                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl overflow-hidden flex-shrink-0"
+                                        style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                        {selectedPlayer.avatar_url
+                                            ? <img src={selectedPlayer.avatar_url} alt="" className="w-full h-full object-cover" />
+                                            : getAvatar(selectedPlayer.display_name)}
                                     </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h2 className="text-xl font-black text-gradient-gold truncate">{selectedPlayer.display_name}</h2>
+                                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{selectedPlayer.league} · #{selectedPlayer.friend_id}</p>
+                                        <div className="flex gap-3 mt-2">
+                                            <span className="text-xs font-bold" style={{ color: 'var(--color-gold)' }}>{selectedPlayer.score} pts</span>
+                                            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>🔥 {selectedPlayer.streak} dias</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedPlayer(null)}
+                                        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                                        style={{ background: 'var(--color-glass)', color: 'var(--color-text-muted)' }}>
+                                        <X size={16} />
+                                    </button>
                                 </div>
-                                <button onClick={() => setSelectedPlayer(null)}
-                                    className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                                    style={{ background: 'var(--color-glass)', color: 'var(--color-text-muted)' }}>
-                                    <X size={16} />
-                                </button>
-                            </div>
-                            {friendStatus === 'none' && (
-                                <button onClick={handleAddFriendFromRanking} disabled={addingFriend}
-                                    className="btn-gold w-full flex items-center justify-center gap-2">
-                                    {addingFriend ? 'Enviando...' : <><UserPlus size={15} /> Adicionar como amigo</>}
-                                </button>
-                            )}
-                            {friendStatus === 'pending_sent' && (
-                                <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
-                                    style={{ background: 'rgba(212,168,83,0.08)', color: 'var(--color-gold-dim)', border: '1px solid rgba(212,168,83,0.2)' }}>
-                                    <Check size={15} /> Solicitação enviada
-                                </div>
-                            )}
-                            {friendStatus === 'accepted' && (
-                                <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
-                                    style={{ background: 'rgba(45,212,191,0.08)', color: 'var(--color-success)', border: '1px solid rgba(45,212,191,0.2)' }}>
-                                    <Check size={15} /> Já são amigos
-                                </div>
-                            )}
+                                {friendStatus === 'none' && (
+                                    <button onClick={handleAddFriendFromRanking} disabled={addingFriend}
+                                        className="btn-gold w-full flex items-center justify-center gap-2">
+                                        {addingFriend ? 'Enviando...' : <><UserPlus size={15} /> Adicionar como amigo</>}
+                                    </button>
+                                )}
+                                {friendStatus === 'pending_sent' && (
+                                    <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
+                                        style={{ background: 'rgba(212,168,83,0.08)', color: 'var(--color-gold-dim)', border: '1px solid rgba(212,168,83,0.2)' }}>
+                                        <Check size={15} /> Solicitação enviada
+                                    </div>
+                                )}
+                                {friendStatus === 'accepted' && (
+                                    <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
+                                        style={{ background: 'rgba(45,212,191,0.08)', color: 'var(--color-success)', border: '1px solid rgba(45,212,191,0.2)' }}>
+                                        <Check size={15} /> Já são amigos
+                                    </div>
+                                )}
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
+
 
             {/* Modals */}
-            {promotionData && (
-                <PromotionModal
-                    isOpen={showPromotionModal}
-                    fromLeague={promotionData.from}
-                    toLeague={promotionData.to}
-                    onClose={() => {
-                        setShowPromotionModal(false);
-                        setPromotionData(null);
-                    }}
-                />
-            )}
-            {demotionData && (
-                <DemotionModal
-                    isOpen={showDemotionModal}
-                    fromLeague={demotionData.from}
-                    toLeague={demotionData.to}
-                    onClose={() => {
-                        setShowDemotionModal(false);
-                        setDemotionData(null);
-                    }}
-                />
-            )}
+            {
+                promotionData && (
+                    <PromotionModal
+                        isOpen={showPromotionModal}
+                        fromLeague={promotionData.from}
+                        toLeague={promotionData.to}
+                        onClose={() => {
+                            setShowPromotionModal(false);
+                            setPromotionData(null);
+                        }}
+                    />
+                )
+            }
+            {
+                demotionData && (
+                    <DemotionModal
+                        isOpen={showDemotionModal}
+                        fromLeague={demotionData.from}
+                        toLeague={demotionData.to}
+                        onClose={() => {
+                            setShowDemotionModal(false);
+                            setDemotionData(null);
+                        }}
+                    />
+                )
+            }
 
             {/* Header */}
             <div className="px-5 pt-10 pb-6">
@@ -311,121 +339,123 @@ export default function RankingPage() {
                 </div>
             </div>
 
-            {loading ? (
-                <div className="flex items-center justify-center py-20">
-                    <div className="text-center">
-                        <LoaderIcon color={leagueColor} />
-                        <p className="text-sm mt-3" style={{ color: 'var(--color-text-muted)' }}>Procurando oponentes...</p>
+            {
+                loading ? (
+                    <div className="flex items-center justify-center py-20">
+                        <div className="text-center">
+                            <LoaderIcon color={leagueColor} />
+                            <p className="text-sm mt-3" style={{ color: 'var(--color-text-muted)' }}>Procurando oponentes...</p>
+                        </div>
                     </div>
-                </div>
-            ) : data.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-                    <LeagueIcon size={48} style={{ color: leagueColor, opacity: 0.5, marginBottom: 16 }} />
-                    <p className="font-bold text-lg mb-2 text-[var(--color-text)]">Liga Vazia</p>
-                    <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Ainda não há jogadores nesta divisão.</p>
-                </div>
-            ) : (
-                <div className="px-5 space-y-3 mt-4">
-                    {data.map((entry, i) => {
-                        // Position info
-                        const pos = i + 1;
-                        let medalInfo = null;
+                ) : data.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+                        <LeagueIcon size={48} style={{ color: leagueColor, opacity: 0.5, marginBottom: 16 }} />
+                        <p className="font-bold text-lg mb-2 text-[var(--color-text)]">Liga Vazia</p>
+                        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Ainda não há jogadores nesta divisão.</p>
+                    </div>
+                ) : (
+                    <div className="px-5 space-y-3 mt-4">
+                        {data.map((entry, i) => {
+                            // Position info
+                            const pos = i + 1;
+                            let medalInfo = null;
 
-                        // Podium medals for top 3
-                        if (pos === 1) medalInfo = { icon: '🥇', bg: 'linear-gradient(135deg, #FFB800, #F29100)', shadow: 'rgba(255, 184, 0, 0.4)' };
-                        else if (pos === 2) medalInfo = { icon: '🥈', bg: 'linear-gradient(135deg, #E0E0E0, #9E9E9E)', shadow: 'rgba(224, 224, 224, 0.4)' };
-                        else if (pos === 3) medalInfo = { icon: '🥉', bg: 'linear-gradient(135deg, #CD7F32, #A0522D)', shadow: 'rgba(205, 127, 50, 0.4)' };
+                            // Podium medals for top 3
+                            if (pos === 1) medalInfo = { icon: '🥇', bg: 'linear-gradient(135deg, #FFB800, #F29100)', shadow: 'rgba(255, 184, 0, 0.4)' };
+                            else if (pos === 2) medalInfo = { icon: '🥈', bg: 'linear-gradient(135deg, #E0E0E0, #9E9E9E)', shadow: 'rgba(224, 224, 224, 0.4)' };
+                            else if (pos === 3) medalInfo = { icon: '🥉', bg: 'linear-gradient(135deg, #CD7F32, #A0522D)', shadow: 'rgba(205, 127, 50, 0.4)' };
 
-                        // League Promotion/Demotion Logic
-                        const total = data.length;
-                        let status: 'promo' | 'neutral' | 'down' = 'neutral';
+                            // League Promotion/Demotion Logic
+                            const total = data.length;
+                            let status: 'promo' | 'neutral' | 'down' = 'neutral';
 
-                        if (tab === 'Bronze') {
-                            if (pos <= total * 0.3) status = 'promo';
-                        } else if (tab === 'Prata') {
-                            if (pos <= total * 0.2) status = 'promo';
-                            else if (pos > total * 0.8) status = 'down';
-                        } else if (tab === 'Ouro') {
-                            if (pos <= total * 0.1) status = 'promo';
-                            else if (pos > total * 0.7) status = 'down';
-                        } else if (tab === 'Diamante') {
-                            if (pos <= total * 0.05) status = 'promo';
-                            else if (pos > total * 0.5) status = 'down';
-                        } else if (tab === 'Campeonato') {
-                            if (pos > total * 0.3) status = 'down';
-                        }
+                            if (tab === 'Bronze') {
+                                if (pos <= total * 0.3) status = 'promo';
+                            } else if (tab === 'Prata') {
+                                if (pos <= total * 0.2) status = 'promo';
+                                else if (pos > total * 0.8) status = 'down';
+                            } else if (tab === 'Ouro') {
+                                if (pos <= total * 0.1) status = 'promo';
+                                else if (pos > total * 0.7) status = 'down';
+                            } else if (tab === 'Diamante') {
+                                if (pos <= total * 0.05) status = 'promo';
+                                else if (pos > total * 0.5) status = 'down';
+                            } else if (tab === 'Campeonato') {
+                                if (pos > total * 0.3) status = 'down';
+                            }
 
-                        const statusStyle = status === 'promo'
-                            ? { color: '#4ADE80', bg: 'rgba(74, 222, 128, 0.1)', label: 'ZONA DE PROMOÇÃO' }
-                            : status === 'down'
-                                ? { color: '#F87171', bg: 'rgba(248, 113, 113, 0.1)', label: 'ZONA DE QUEDA' }
-                                : null;
+                            const statusStyle = status === 'promo'
+                                ? { color: '#4ADE80', bg: 'rgba(74, 222, 128, 0.1)', label: 'ZONA DE PROMOÇÃO' }
+                                : status === 'down'
+                                    ? { color: '#F87171', bg: 'rgba(248, 113, 113, 0.1)', label: 'ZONA DE QUEDA' }
+                                    : null;
 
-                        return (
-                            <motion.div key={entry.id}
-                                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.03 }}
-                                className="flex items-center justify-between p-2 rounded-full cursor-pointer"
-                                style={{
-                                    background: entry.isMe ? 'var(--color-glass-strong)' : 'var(--color-glass)',
-                                    border: entry.isMe ? '1px solid var(--color-glass-strong)' : '1px solid var(--color-glass)',
-                                }}
-                                onClick={() => openPlayer(entry)}
-                            >
+                            return (
+                                <motion.div key={entry.id}
+                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.03 }}
+                                    className="flex items-center justify-between p-2 rounded-full cursor-pointer"
+                                    style={{
+                                        background: entry.isMe ? 'var(--color-glass-strong)' : 'var(--color-glass)',
+                                        border: entry.isMe ? '1px solid var(--color-glass-strong)' : '1px solid var(--color-glass)',
+                                    }}
+                                    onClick={() => openPlayer(entry)}
+                                >
 
-                                <div className="flex items-center gap-4">
-                                    {/* Avatar */}
-                                    <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-inner flex-shrink-0 overflow-hidden"
-                                        style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                        {entry.avatar_url ? (
-                                            <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            getAvatar(entry.display_name)
-                                        )}
-                                    </div>
-
-                                    <div className="flex flex-col">
-                                        <span className="font-extrabold text-[var(--color-text)] text-[15px] truncate max-w-[120px] sm:max-w-[200px]">
-                                            {entry.display_name}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[11px] font-bold" style={{ color: 'var(--color-gold-dim)' }}>
-                                                {entry.score} pts
-                                            </span>
-                                            {statusStyle && (
-                                                <span className="text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest"
-                                                    style={{ background: statusStyle.bg, color: statusStyle.color }}>
-                                                    {statusStyle.label}
-                                                </span>
+                                    <div className="flex items-center gap-4">
+                                        {/* Avatar */}
+                                        <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl shadow-inner flex-shrink-0 overflow-hidden"
+                                            style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                            {entry.avatar_url ? (
+                                                <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                getAvatar(entry.display_name)
                                             )}
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Rank/Medal Circle */}
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center relative flex-shrink-0"
-                                    style={{
-                                        background: medalInfo ? medalInfo.bg : 'rgba(255,255,255,0.05)',
-                                        boxShadow: medalInfo ? `0 0 15px ${medalInfo.shadow}` : 'none',
-                                    }}>
-                                    {medalInfo ? (
-                                        <>
-                                            <span className="text-sm drop-shadow-md relative z-10">{medalInfo.icon}</span>
-                                            <div className="absolute -bottom-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black z-20"
-                                                style={{ background: 'var(--color-overlay-heavy)', color: 'var(--color-text)', border: '1px solid var(--color-glass-strong)' }}>
-                                                {pos}
+                                        <div className="flex flex-col">
+                                            <span className="font-extrabold text-[var(--color-text)] text-[15px] truncate max-w-[120px] sm:max-w-[200px]">
+                                                {entry.display_name}
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-bold" style={{ color: 'var(--color-gold-dim)' }}>
+                                                    {entry.score} pts
+                                                </span>
+                                                {statusStyle && (
+                                                    <span className="text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest"
+                                                        style={{ background: statusStyle.bg, color: statusStyle.color }}>
+                                                        {statusStyle.label}
+                                                    </span>
+                                                )}
                                             </div>
-                                        </>
-                                    ) : (
-                                        <span className="text-sm font-black" style={{ color: 'var(--color-text-muted)' }}>{pos}</span>
-                                    )}
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Rank/Medal Circle */}
+                                    <div className="w-10 h-10 rounded-full flex items-center justify-center relative flex-shrink-0"
+                                        style={{
+                                            background: medalInfo ? medalInfo.bg : 'rgba(255,255,255,0.05)',
+                                            boxShadow: medalInfo ? `0 0 15px ${medalInfo.shadow}` : 'none',
+                                        }}>
+                                        {medalInfo ? (
+                                            <>
+                                                <span className="text-sm drop-shadow-md relative z-10">{medalInfo.icon}</span>
+                                                <div className="absolute -bottom-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black z-20"
+                                                    style={{ background: 'var(--color-overlay-heavy)', color: 'var(--color-text)', border: '1px solid var(--color-glass-strong)' }}>
+                                                    {pos}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <span className="text-sm font-black" style={{ color: 'var(--color-text-muted)' }}>{pos}</span>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

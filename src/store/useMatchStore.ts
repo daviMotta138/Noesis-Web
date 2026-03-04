@@ -27,6 +27,7 @@ export interface BRMatch {
   max_players: number;
   grid_rows: number;
   grid_cols: number;
+  deck_seed: string | null;
   round_number: number;
   cards_remaining: number;
   current_player_id: string;

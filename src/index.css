@@ -1,6 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap');
 @import "tailwindcss";
 
+/* ── Prevent 300vw HorizontalCanvas from expanding the document ─────────── */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 /* ─── Design Tokens ────────────────────────────────────────────────────────── */
 @theme {
   /* Palette */
