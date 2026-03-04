@@ -20,6 +20,7 @@ import PlaygroundPage from './pages/Playground';
 import BattleRoyalePage from './pages/BattleRoyale';
 import { ChangelogModal } from './components/ChangelogModal';
 import HorizontalCanvas, { CANVAS_ROUTES } from './components/HorizontalCanvas';
+import { MusicPlayer } from './components/MusicPlayer';
 import { initCapacitorNotifications } from './lib/notifications';
 import SplashLoader from './components/SplashLoader';
 
@@ -145,6 +146,7 @@ export default function App() {
             ) : (
               <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
                 <BrowserRouter>
+                  <MusicPlayer />
                   <ChangelogModal />
                   <AnimatedRoutes />
                 </BrowserRouter>

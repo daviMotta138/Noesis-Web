@@ -10,7 +10,7 @@ import logoImg from '../assets/logo-horizontal.png';
 import { sendPushNotification } from '../lib/notifications';
 import { NotificationPrompt } from './NotificationPrompt';
 import { GiftClaimOverlay } from './GiftClaimOverlay';
-import { MusicPlayer, MusicPlayerUI } from './MusicPlayer';
+import { MusicPlayerUI } from './MusicPlayer';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
@@ -127,7 +127,6 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
         <div className="flex min-h-screen bg-transparent">
             <NotificationPrompt />
             <GiftClaimOverlay />
-            <MusicPlayer />
             <MusicPlayerUI className="hidden md:block fixed bottom-6 right-6 z-[100]" />
 
             {/* ── Sidebar (Desktop) ── */}

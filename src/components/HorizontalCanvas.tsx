@@ -1,8 +1,8 @@
 // src/components/HorizontalCanvas.tsx
-// Instagram-style canvas with gesture conflict matrix + spring physics
+// Instagram-style canvas with gesture conflict matrix — no spring bounce
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, useMotionValue, useSpring, animate } from 'framer-motion';
+import { motion, useMotionValue, animate } from 'framer-motion';
 
 // ── Canvas pages (index → route)
 export const CANVAS_ROUTES = ['/', '/ranking', '/profile'] as const;
@@ -49,9 +49,8 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
     const [activeIdx, setActiveIdx] = useState(() => getRouteIndex(location.pathname));
     const W = window.innerWidth;
 
-    // Framer motion values
-    const rawX = useMotionValue(-activeIdx * W);
-    const springX = useSpring(rawX, { stiffness: 420, damping: 38, mass: 0.8 });
+    // Framer motion values — plain motion value, NO spring
+    const x = useMotionValue(-activeIdx * W);
     const gesture = useRef<GestureState | null>(null);
 
     // Sync when route changes externally (e.g. via bottom nav link)
@@ -59,23 +58,17 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
         const idx = getRouteIndex(location.pathname);
         if (idx !== activeIdx) {
             setActiveIdx(idx);
-            animate(rawX, -idx * W, { type: 'spring', stiffness: 420, damping: 38, mass: 0.8 });
+            animate(x, -idx * W, { type: 'tween', ease: 'easeOut', duration: 0.28 });
         }
     }, [location.pathname]);
 
     // Navigate to a canvas page by index
-    const snapTo = useCallback((idx: number, velocity = 0) => {
+    const snapTo = useCallback((idx: number) => {
         const clamped = Math.max(0, Math.min(CANVAS_ROUTES.length - 1, idx));
         setActiveIdx(clamped);
-        animate(rawX, -clamped * W, {
-            type: 'spring',
-            stiffness: 420,
-            damping: 38,
-            mass: 0.8,
-            velocity: -velocity,
-        });
+        animate(x, -clamped * W, { type: 'tween', ease: 'easeOut', duration: 0.28 });
         navigate(CANVAS_ROUTES[clamped], { replace: true });
-    }, [navigate, rawX, W]);
+    }, [navigate, x, W]);
 
     // ── Touch Handlers ──────────────────────────────────────────
     const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -127,13 +120,20 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
             if (!g.scrollAtLimit) return; // inner scroll handles it
         }
 
-        // We own the gesture
+        // We own the gesture — clamp to valid range (no elastic overshoot)
         e.preventDefault();
         const base = -activeIdx * W;
-        const damped = base + dX * 0.5; // resistance at edges
-        rawX.set(damped);
-        springX.set(damped);
-    }, [activeIdx, rawX, springX, W]);
+        const minX = -(CANVAS_ROUTES.length - 1) * W;
+        const maxX = 0;
+        // Allow a little drag resistance at the edges but clamp hard
+        const raw = base + dX;
+        const clamped = Math.max(minX, Math.min(maxX, raw));
+        // Add slight resistance when beyond bounds
+        const target = raw < minX ? minX + (raw - minX) * 0.15
+            : raw > maxX ? maxX + (raw - maxX) * 0.15
+                : clamped;
+        x.set(target);
+    }, [activeIdx, x, W]);
 
     const onTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
         if (!gesture.current || gesture.current.locked !== 'horizontal') return;
@@ -150,10 +150,10 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
         const far = ratio > SNAP_DISTANCE;
 
         if (fast || far) {
-            if (dX < 0) { snapTo(activeIdx + 1, velocity); }
-            else { snapTo(activeIdx - 1, velocity); }
+            if (dX < 0) { snapTo(activeIdx + 1); }
+            else { snapTo(activeIdx - 1); }
         } else {
-            snapTo(activeIdx, 0); // snap back
+            snapTo(activeIdx); // snap back — no bounce
         }
     }, [activeIdx, snapTo, W]);
 
@@ -168,7 +168,7 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
         >
             <motion.div
                 style={{
-                    x: springX,
+                    x,
                     display: 'flex',
                     width: `${CANVAS_ROUTES.length * 100}vw`,
                     height: '100%',
