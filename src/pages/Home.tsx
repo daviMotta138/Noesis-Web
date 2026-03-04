@@ -77,7 +77,7 @@ function ViewingPhase() {
     };
 
     return (
-        <div className="flex flex-col min-h-screen pb-24">
+        <div className="flex flex-col min-h-screen pb-24 max-w-lg mx-auto w-full">
             {/* Header */}
             <div className="px-5 pt-10 pb-6">
                 <div className="flex items-start justify-between">
@@ -103,7 +103,7 @@ function ViewingPhase() {
 
             {/* Fortnite-style Banners Carousel */}
             {banners.length > 0 && !flipped && (
-                <div className="mb-6 px-5 relative z-10 w-full max-w-sm mx-auto md:max-w-xl">
+                <div className="mb-6 px-5 relative z-10 w-full">
                     <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg"
                         style={{ background: 'var(--color-card)' }}>
                         <AnimatePresence mode="popLayout">
