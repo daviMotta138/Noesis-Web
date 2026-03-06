@@ -21,7 +21,15 @@ function ViewingPhase() {
     const [loading, setLoading] = useState(false);
     const [banners, setBanners] = useState<any[]>([]);
     const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-    const [expandedBanner, setExpandedBanner] = useState<string | null>(null);
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(0);
+
+    // ESC key closes lightbox
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxOpen(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
 
     // Load stored weekly challenge info
     const weeklyUsedKey = `noesis_weekly_challenge_${new Date().getFullYear()}_${new Date().getMonth()}`;
@@ -181,7 +189,7 @@ function ViewingPhase() {
 
                     {/* Banners carousel */}
                     {banners.length > 0 && !flipped && (
-                        <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg"
+                        <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg cursor-pointer"
                             style={{ background: 'var(--color-card)' }}>
                             <AnimatePresence mode="popLayout">
                                 <motion.div
@@ -190,12 +198,8 @@ function ViewingPhase() {
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 0.5 }}
-                                    className="absolute inset-0 cursor-pointer"
-                                    onClick={() => {
-                                        if (banners[currentBannerIndex].link_url) {
-                                            window.open(banners[currentBannerIndex].link_url, '_blank');
-                                        }
-                                    }}
+                                    className="absolute inset-0"
+                                    onClick={() => { setLightboxIndex(currentBannerIndex); setLightboxOpen(true); }}
                                 >
                                     <img src={banners[currentBannerIndex].image_url} alt={banners[currentBannerIndex].title} className="w-full h-full object-cover" />
                                 </motion.div>
@@ -214,21 +218,17 @@ function ViewingPhase() {
                                     </motion.p>
                                 </AnimatePresence>
                             </div>
-                            {/* Expand button bottom-right */}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setExpandedBanner(banners[currentBannerIndex].image_url); }}
-                                className="absolute bottom-3 right-3 z-30 p-1.5 rounded-lg transition-all"
-                                style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.15)' }}
-                                title="Ampliar">
-                                <Maximize2 size={13} className="text-white/80" />
-                            </button>
+                            {/* Expand hint icon */}
+                            <div className="absolute top-2.5 right-2.5 z-20 p-1.5 rounded-lg pointer-events-none"
+                                style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+                                <Maximize2 size={12} className="text-white/70" />
+                            </div>
                             {banners.length > 1 && (
-                                <div className="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-20">
+                                <div className="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-20 pointer-events-none">
                                     {banners.map((_, i) => (
-                                        <button
+                                        <div
                                             key={i}
-                                            onClick={() => setCurrentBannerIndex(i)}
-                                            className={`h-1.5 rounded-full transition-all duration-300 ${i === currentBannerIndex ? 'w-5 bg-white shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'w-1.5 bg-white/40 hover:bg-white/70'}`}
+                                            className={`h-1.5 rounded-full transition-all duration-300 ${i === currentBannerIndex ? 'w-5 bg-white shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'w-1.5 bg-white/40'}`}
                                         />
                                     ))}
                                 </div>
@@ -238,35 +238,77 @@ function ViewingPhase() {
 
                     {/* Fullscreen Lightbox */}
                     <AnimatePresence>
-                        {expandedBanner && (
+                        {lightboxOpen && banners.length > 0 && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                transition={{ duration: 0.22 }}
-                                className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10"
-                                style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)' }}
-                                onClick={() => setExpandedBanner(null)}>
+                                transition={{ duration: 0.2 }}
+                                className="fixed inset-0 z-[100] flex items-center justify-center"
+                                style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(14px)' }}
+                                onClick={() => setLightboxOpen(false)}>
+
+                                {/* Image Container */}
                                 <motion.div
-                                    initial={{ scale: 0.82, opacity: 0 }}
+                                    key={lightboxIndex}
+                                    initial={{ scale: 0.85, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.82, opacity: 0 }}
-                                    transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-                                    className="relative max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl"
+                                    exit={{ scale: 0.85, opacity: 0 }}
+                                    transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+                                    className="relative w-full max-w-4xl mx-4"
                                     onClick={e => e.stopPropagation()}>
                                     <img
-                                        src={expandedBanner}
-                                        alt="Banner ampliado"
-                                        className="w-full h-auto max-h-[80vh] object-contain"
-                                        style={{ background: 'var(--color-card)' }}
+                                        src={banners[lightboxIndex].image_url}
+                                        alt={banners[lightboxIndex].title}
+                                        className="w-full h-auto max-h-[82vh] object-contain rounded-xl shadow-2xl"
                                     />
+                                    {/* Title */}
+                                    {banners[lightboxIndex].title && (
+                                        <div className="absolute inset-x-0 bottom-0 px-4 py-3 bg-gradient-to-t from-black/70 to-transparent rounded-b-xl">
+                                            <p className="text-sm font-bold text-white truncate">{banners[lightboxIndex].title}</p>
+                                            {banners[lightboxIndex].link_url && (
+                                                <a href={banners[lightboxIndex].link_url} target="_blank" rel="noreferrer"
+                                                    className="text-xs text-blue-400 hover:underline">
+                                                    Abrir link →
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
+                                    {/* Close */}
                                     <button
-                                        onClick={() => setExpandedBanner(null)}
-                                        className="absolute top-3 right-3 p-2 rounded-xl transition-all"
-                                        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                        onClick={() => setLightboxOpen(false)}
+                                        className="absolute top-2 right-2 p-2.5 rounded-xl transition-all hover:bg-white/10"
+                                        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
                                         <X size={18} className="text-white" />
                                     </button>
                                 </motion.div>
+
+                                {/* Prev / Next arrows — outside image container so ESC+outside still work */}
+                                {banners.length > 1 && (
+                                    <>
+                                        <button
+                                            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + banners.length) % banners.length); }}
+                                            className="fixed left-3 md:left-6 top-1/2 -translate-y-1/2 z-[110] p-3 rounded-xl transition-all hover:bg-white/10"
+                                            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                            <ChevronRight size={22} className="text-white rotate-180" />
+                                        </button>
+                                        <button
+                                            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % banners.length); }}
+                                            className="fixed right-3 md:right-6 top-1/2 -translate-y-1/2 z-[110] p-3 rounded-xl transition-all hover:bg-white/10"
+                                            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                            <ChevronRight size={22} className="text-white" />
+                                        </button>
+                                        {/* Dot indicators */}
+                                        <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-2 z-[110]">
+                                            {banners.map((_, i) => (
+                                                <button key={i}
+                                                    onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
+                                                    className={`h-1.5 rounded-full transition-all duration-300 ${i === lightboxIndex ? 'w-6 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+                                                />
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
