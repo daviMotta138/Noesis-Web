@@ -227,18 +227,18 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
         if (!session || !user) { addLog('Sem sessão ativa para avançar.'); return; }
         const now = Date.now() - 1000;
         await supabase.from('daily_sessions').update({ unlocks_at: new Date(now).toISOString() }).eq('id', session.id);
-        setUnlockAt(now); setPhase('recall'); addLog(`✓ Cronômetro avançado → Fase: recall`);
+        setUnlockAt(now); setPhase('recall'); addLog(`✓ Meu cronômetro avançado → Fase: recall`);
     };
     const handleSetShort = async () => {
-        if (!session || !user) { addLog('Sem sessão ativa.'); return; }
+        if (!session || !user) { addLog('Minha conta Admin não tem sessão ativa.'); return; }
         const ts = Date.now() + 10_000;
         await supabase.from('daily_sessions').update({ unlocks_at: new Date(ts).toISOString() }).eq('id', session.id);
-        setUnlockAt(ts); setPhase('waiting'); addLog('✓ Cronômetro → 10 segundos');
+        setUnlockAt(ts); setPhase('waiting'); addLog('✓ Meu cronômetro → 10 segundos');
     };
     const handleResetSession = async () => {
-        if (!session) { addLog('Sem sessão para resetar.'); return; }
+        if (!session) { addLog('Não tenho sessão pessoal para resetar.'); return; }
         await supabase.from('daily_sessions').delete().eq('id', session.id);
-        setPhase('viewing'); setUnlockAt(null); addLog('✓ Sessão deletada → fase: viewing');
+        setPhase('viewing'); setUnlockAt(null); addLog('✓ Minha sessão deletada → fase: viewing');
     };
     const handleReload = async () => {
         if (user?.id) { await loadActiveSession(user.id); await fetchProfile(user.id); addLog('✓ Session e perfil recarregados'); }
@@ -283,17 +283,26 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
         setUserSearch(u.display_name);
         setTargetSession(null);
         setLoadingSession(true);
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('daily_sessions')
             .select('*')
             .eq('user_id', u.id)
             .is('recalled_at', null)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
-        setTargetSession(data || null);
+            .maybeSingle();
+
+        if (error) {
+            addLog(`Erro ao carregar sessão de ${u.display_name}: ${error.message}`);
+        } else {
+            setTargetSession(data || null);
+            if (data) {
+                addLog(`✓ Sessão ativa de ${u.display_name} carregada`);
+            } else {
+                addLog(`ℹ ${u.display_name} não possui sessão ativa no momento`);
+            }
+        }
         setLoadingSession(false);
-        addLog(`✓ Sessão de ${u.display_name} carregada`);
     };
 
     const updateTargetSession = async (unlockMs: number) => {
@@ -303,12 +312,12 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
             .from('daily_sessions')
             .update({ unlocks_at: iso })
             .eq('id', targetSession.id);
-        if (error) { addLog(`Erro: ${error.message}`); return; }
+        if (error) { addLog(`Erro ao atualizar usuário: ${error.message}`); return; }
         setTargetSession((s: any) => ({ ...s, unlocks_at: iso }));
         const remaining = unlockMs > Date.now()
             ? `${Math.round((unlockMs - Date.now()) / 60000)} min restantes`
             : 'Liberado agora';
-        addLog(`✓ Timer de ${selectedUser?.display_name} → ${remaining}`);
+        addLog(`✓ Timer de ${selectedUser?.display_name} atualizado → ${remaining}`);
     };
 
     const deleteTargetSession = async () => {
