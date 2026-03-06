@@ -45,6 +45,7 @@ interface GameState {
     checkPendingGifts: () => Promise<void>;
     startSession: (words: string[], challengeHours?: number, challengeReward?: number) => Promise<void>;
     submitRecall: (answers: string[], score: number, nousEarned: number) => Promise<void>;
+    giveUpSession: () => Promise<void>;
     loadActiveSession: (userId: string) => Promise<void>;
     // Challenge selection
     challengeHours: number;
@@ -227,6 +228,24 @@ export const useGameStore = create<GameState>()(
                 // Do NOT auto-advance phase — RecallPhase will call setPhase('result') on PROSSEGUIR click
                 set({ unlockAt: null });
                 await get().fetchProfile(user.id);
+            },
+
+            // Give-up: cancels the session WITHOUT touching streak or shield
+            giveUpSession: async () => {
+                const { session, user } = get();
+                if (!session || !user) return;
+                // Mark session as recalled with score 0 so it doesn't linger as active
+                await supabase
+                    .from('daily_sessions')
+                    .update({
+                        recalled_at: new Date().toISOString(),
+                        answers: [],
+                        score: 0,
+                        success: false,
+                    })
+                    .eq('id', session.id);
+                // Clear local state — streak/shield UNCHANGED
+                set({ session: null, unlockAt: null });
             },
 
             loadActiveSession: async (userId) => {

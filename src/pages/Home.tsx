@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle, Maximize2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +24,42 @@ function ViewingPhase() {
     const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    const [weeklyAnimating, setWeeklyAnimating] = useState(false); // beams firing
+    const [weeklyGlow, setWeeklyGlow] = useState(false);           // cards turned purple
+
+    // Neon beam animation trigger
+    const fireWeeklyAnimation = () => {
+        if (weeklyGlow || weeklyAnimating) return;
+        setWeeklyAnimating(true);
+        // After 2.5s beams merge with cards
+        setTimeout(() => {
+            setWeeklyGlow(true);
+            setWeeklyAnimating(false);
+        }, 2500);
+    };
+
+    // Inject neon beam keyframes once
+    useEffect(() => {
+        const id = 'noesis-neon-styles';
+        if (document.getElementById(id)) return;
+        const style = document.createElement('style');
+        style.id = id;
+        style.textContent = `
+            @keyframes neon-spin-1 { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+            @keyframes neon-spin-2 { from { transform: rotate(0deg); }   to { transform: rotate(-360deg); } }
+            @keyframes neon-spin-3 { from { transform: rotate(60deg); }  to { transform: rotate(420deg); } }
+            @keyframes neon-pulse-ring {
+                0%, 100% { opacity: 0.9; transform: translate(-50%,-50%) scale(1); }
+                50%       { opacity: 0.35; transform: translate(-50%,-50%) scale(1.06); }
+            }
+            @keyframes weekly-btn-pulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.5); }
+                50%       { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }, []);
+
 
     // ESC key closes lightbox
     useEffect(() => {
@@ -85,6 +122,8 @@ function ViewingPhase() {
         setLoading(false);
     };
 
+    const isWeeklySelected = challengeHours === 168;
+
     return (
         <div className="flex flex-col min-h-screen pb-24 max-w-5xl mx-auto w-full">
             {/* Header — full width */}
@@ -131,13 +170,51 @@ function ViewingPhase() {
                     )}
 
                     {/* Cards grid */}
-                    <div className="grid grid-cols-3 gap-3 justify-items-center">
+                    <div className="grid grid-cols-3 gap-3 justify-items-center relative">
+                        {/* Neon beam overlay — only while animating */}
+                        <AnimatePresence>
+                            {weeklyAnimating && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0, transition: { duration: 0.7 } }}
+                                    className="absolute inset-0 z-10 pointer-events-none"
+                                    style={{ overflow: 'visible' }}>
+                                    {/* Classic orbit: zero-size pivot at center, child offset outward */}
+                                    {[
+                                        { radius: 140, duration: '1.3s', delay: '0s', color: '#A855F7' },
+                                        { radius: 110, duration: '1.7s', delay: '-0.5s', color: '#C084FC' },
+                                        { radius: 165, duration: '2.1s', delay: '-1s', color: '#7C3AED' },
+                                    ].map((b, i) => (
+                                        <div key={i} style={{
+                                            position: 'absolute',
+                                            left: '50%', top: '50%',
+                                            width: 0, height: 0,
+                                            animation: `neon-spin-${i + 1} ${b.duration} linear infinite`,
+                                            animationDelay: b.delay,
+                                        }}>
+                                            <div style={{
+                                                position: 'absolute',
+                                                left: b.radius,
+                                                top: -14,
+                                                width: 6,
+                                                height: 28,
+                                                borderRadius: 3,
+                                                background: `linear-gradient(to bottom, ${b.color}, rgba(168,85,247,0))`,
+                                                boxShadow: `0 0 10px 3px ${b.color}99`,
+                                            }} />
+                                        </div>
+                                    ))}
+                                    {/* Pulsing border ring removed — beams only */}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         {words.map((word, i) => (
                             <motion.div key={`${word}-${i}`}
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.04 }}>
-                                <MemoryCard word={word} isHidden={flipped} />
+                                <MemoryCard word={word} isHidden={flipped} weeklyGlow={weeklyGlow} glowAnimating={weeklyAnimating} />
                             </motion.div>
                         ))}
                     </div>
@@ -236,91 +313,99 @@ function ViewingPhase() {
                         </div>
                     )}
 
-                    {/* Fullscreen Lightbox */}
-                    <AnimatePresence>
-                        {lightboxOpen && banners.length > 0 && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.18 }}
-                                className="fixed inset-0 z-[100]"
-                                style={{ background: 'rgba(0,0,0,0.93)', backdropFilter: 'blur(14px)' }}
-                                onClick={() => setLightboxOpen(false)}>
-
-                                {/* Close — pinned top-right, always visible */}
-                                <button
-                                    onClick={() => setLightboxOpen(false)}
-                                    className="absolute top-4 right-4 z-10 p-2.5 rounded-xl"
-                                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                                    <X size={18} className="text-white" />
-                                </button>
-
-                                {/* Image area — fixed height, centered, never shifts */}
-                                <div className="absolute inset-x-0 top-12 bottom-20 flex items-center justify-center px-4"
+                    {/* Fullscreen Lightbox — rendered in a portal so position:fixed escapes the HorizontalCanvas transform */}
+                    {createPortal(
+                        <AnimatePresence>
+                            {lightboxOpen && banners.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.18 }}
+                                    className="fixed inset-0 z-[100]"
+                                    style={{ background: 'rgba(0,0,0,0.93)', backdropFilter: 'blur(14px)' }}
                                     onClick={() => setLightboxOpen(false)}>
-                                    <motion.div
-                                        key={lightboxIndex}
-                                        initial={{ scale: 0.9, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.9, opacity: 0 }}
-                                        transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-                                        className="relative w-full max-w-3xl h-full"
-                                        onClick={e => e.stopPropagation()}>
-                                        <img
-                                            src={banners[lightboxIndex].image_url}
-                                            alt={banners[lightboxIndex].title}
-                                            className="w-full h-full object-contain rounded-xl shadow-2xl"
-                                        />
-                                        {/* Title overlay */}
-                                        {banners[lightboxIndex].title && (
-                                            <div className="absolute inset-x-0 bottom-0 px-4 py-3 rounded-b-xl"
-                                                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
-                                                <p className="text-sm font-bold text-white truncate">{banners[lightboxIndex].title}</p>
-                                                {banners[lightboxIndex].link_url && (
-                                                    <a href={banners[lightboxIndex].link_url} target="_blank" rel="noreferrer"
-                                                        className="text-xs text-blue-400 hover:underline">
-                                                        Abrir link →
-                                                    </a>
-                                                )}
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                </div>
 
-                                {/* Navigation — pinned to bottom, never shifts */}
-                                {banners.length > 1 && (
-                                    <div className="absolute bottom-0 inset-x-0 h-20 flex items-center justify-center gap-4"
-                                        onClick={e => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => setLightboxIndex(i => (i - 1 + banners.length) % banners.length)}
-                                            className="p-3 rounded-xl"
-                                            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                                            <ChevronRight size={20} className="text-white rotate-180" />
-                                        </button>
-                                        <div className="flex gap-1.5 items-center">
-                                            {banners.map((_, i) => (
-                                                <button key={i}
-                                                    onClick={() => setLightboxIndex(i)}
-                                                    className={`h-1.5 rounded-full transition-all duration-300 ${i === lightboxIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/40'}`}
-                                                />
-                                            ))}
-                                        </div>
-                                        <button
-                                            onClick={() => setLightboxIndex(i => (i + 1) % banners.length)}
-                                            className="p-3 rounded-xl"
-                                            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                                            <ChevronRight size={20} className="text-white" />
-                                        </button>
+                                    {/* Close — pinned top-right, always visible */}
+                                    <button
+                                        onClick={() => setLightboxOpen(false)}
+                                        className="absolute top-4 right-4 z-10 p-2.5 rounded-xl"
+                                        style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                        <X size={18} className="text-white" />
+                                    </button>
+
+                                    {/* Image area — fixed height, centered, never shifts */}
+                                    <div className="absolute inset-x-0 top-12 bottom-20 flex items-center justify-center px-4"
+                                        onClick={() => setLightboxOpen(false)}>
+                                        <motion.div
+                                            key={lightboxIndex}
+                                            initial={{ scale: 0.9, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            exit={{ scale: 0.9, opacity: 0 }}
+                                            transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+                                            className="relative w-full max-w-3xl h-full"
+                                            onClick={e => e.stopPropagation()}>
+                                            <img
+                                                src={banners[lightboxIndex].image_url}
+                                                alt={banners[lightboxIndex].title}
+                                                className="w-full h-full object-contain rounded-xl shadow-2xl"
+                                            />
+                                            {/* Title overlay */}
+                                            {banners[lightboxIndex].title && (
+                                                <div className="absolute inset-x-0 bottom-0 px-4 py-3 rounded-b-xl"
+                                                    style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
+                                                    <p className="text-sm font-bold text-white truncate">{banners[lightboxIndex].title}</p>
+                                                    {banners[lightboxIndex].link_url && (
+                                                        <a href={banners[lightboxIndex].link_url} target="_blank" rel="noreferrer"
+                                                            className="text-xs text-blue-400 hover:underline">
+                                                            Abrir link →
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </motion.div>
                                     </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+
+                                    {/* Navigation — pinned to bottom, never shifts */}
+                                    {banners.length > 1 && (
+                                        <div className="absolute bottom-0 inset-x-0 h-20 flex items-center justify-center gap-4"
+                                            onClick={e => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => setLightboxIndex(i => (i - 1 + banners.length) % banners.length)}
+                                                className="p-3 rounded-xl"
+                                                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                                <ChevronRight size={20} className="text-white rotate-180" />
+                                            </button>
+                                            <div className="flex gap-1.5 items-center">
+                                                {banners.map((_, i) => (
+                                                    <button key={i}
+                                                        onClick={() => setLightboxIndex(i)}
+                                                        className={`h-1.5 rounded-full transition-all duration-300 ${i === lightboxIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/40'}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => setLightboxIndex(i => (i + 1) % banners.length)}
+                                                className="p-3 rounded-xl"
+                                                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                                <ChevronRight size={20} className="text-white" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>,
+                        document.body
+                    )}
 
                     {/* Challenge time */}
                     {!flipped && (
-                        <div className="panel p-4">
+                        <div className="panel p-4 transition-all duration-500"
+                            style={isWeeklySelected ? {
+                                background: 'linear-gradient(135deg, rgba(88,28,135,0.25), rgba(124,58,237,0.15))',
+                                border: '1px solid rgba(168,85,247,0.45)',
+                                boxShadow: '0 0 24px rgba(168,85,247,0.15)',
+                            } : {}}>
                             <div className="flex items-center justify-between mb-3">
                                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                                     ⚡ Tempo de Desafio
@@ -329,38 +414,63 @@ function ViewingPhase() {
                                     +{challengeReward} <img src={coinImg} className="inline w-3.5 h-3.5 object-contain mb-0.5" alt="" />
                                 </span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                {CHALLENGE_OPTIONS.map(opt => {
+                            <div className="flex gap-2">
+                                {CHALLENGE_OPTIONS.filter(o => !o.weekly).map(opt => {
                                     const isSelected = challengeHours === opt.hours;
-                                    const isDisabled = opt.weekly && weeklyAlreadyUsed;
                                     return (
                                         <button
                                             key={opt.hours}
-                                            disabled={isDisabled}
-                                            onClick={() => { setChallengeHours(opt.hours); setChallengeReward(opt.reward); audio.play('nav'); }}
-                                            className="flex flex-col items-center px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 relative"
+                                            onClick={() => {
+                                                setChallengeHours(opt.hours);
+                                                setChallengeReward(opt.reward);
+                                                audio.play('nav');
+                                                setWeeklyGlow(false); setWeeklyAnimating(false);
+                                            }}
+                                            className="flex-1 flex flex-col items-center py-2 rounded-xl text-xs font-black transition-all duration-150"
                                             style={{
-                                                background: isSelected
-                                                    ? (opt.weekly ? 'linear-gradient(135deg, #7C3AED, #A855F7)' : 'linear-gradient(135deg, #C49333, #E8B84B)')
-                                                    : 'var(--color-glass)',
-                                                color: isSelected ? '#0D0F1C' : (opt.weekly ? '#A855F7' : 'var(--color-text-muted)'),
-                                                border: isSelected ? 'none' : (opt.weekly ? '1px solid rgba(168,85,247,0.3)' : '1px solid var(--color-border)'),
-                                                opacity: isDisabled ? 0.4 : 1,
-                                                minWidth: 52,
+                                                background: isSelected ? 'linear-gradient(135deg, #C49333, #E8B84B)' : 'var(--color-glass)',
+                                                color: isSelected ? '#0D0F1C' : 'var(--color-text-muted)',
+                                                border: isSelected ? 'none' : '1px solid var(--color-border)',
                                             }}
                                         >
                                             <span>{opt.label}</span>
                                             <span className="text-[9px] mt-0.5 opacity-80">+{opt.reward}🪙</span>
-                                            {opt.weekly && (
-                                                <span className="absolute -top-2 -right-1 text-[8px] font-black px-1 rounded-full"
-                                                    style={{ background: '#7C3AED', color: 'white' }}>
-                                                    {isDisabled ? '✓ usado' : '1×/mês'}
-                                                </span>
-                                            )}
                                         </button>
                                     );
                                 })}
                             </div>
+
+                            {/* Weekly — full width, own row (hidden if already used) */}
+                            {!weeklyAlreadyUsed && (() => {
+                                const opt = CHALLENGE_OPTIONS.find(o => o.weekly)!;
+                                const isSelected = challengeHours === opt.hours;
+                                return (
+                                    <button
+                                        onClick={() => {
+                                            setChallengeHours(opt.hours);
+                                            setChallengeReward(opt.reward);
+                                            audio.play('nav');
+                                            fireWeeklyAnimation();
+                                        }}
+                                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black transition-all duration-150"
+                                        style={{
+                                            background: isSelected ? 'linear-gradient(135deg, #7C3AED, #A855F7)' : 'rgba(168,85,247,0.08)',
+                                            color: isSelected ? '#fff' : '#A855F7',
+                                            border: isSelected ? 'none' : '1px solid rgba(168,85,247,0.4)',
+                                            animation: !isSelected ? 'weekly-btn-pulse 2s ease-in-out infinite' : undefined,
+                                        }}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-base">👑</span>
+                                            <div className="text-left">
+                                                <div>{opt.label} — <span className="opacity-70">Desafio Semanal</span></div>
+                                                <div className="text-[10px] font-normal opacity-60 mt-0.5">1× por mês · Acerte tudo após 1 semana</div>
+                                            </div>
+                                        </div>
+                                        <span className="font-black text-sm">+{opt.reward}🪙</span>
+                                    </button>
+                                );
+                            })()}
                             <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
                                 Espere o tempo e acerte todas as palavras para ganhar os Nous!
                             </p>
@@ -406,9 +516,10 @@ function ViewingPhase() {
 
 // ─── Waiting Phase ─────────────────────────────────────────────────────────────
 function WaitingPhase() {
-    const { session, unlockAt, setPhase, submitRecall } = useGameStore();
+    const { session, unlockAt, setPhase, giveUpSession, challengeHours } = useGameStore();
     const [showGiveUpConfirm, setShowGiveUpConfirm] = useState(false);
     const [loading, setLoading] = useState(false);
+    const isWeekly = challengeHours === 168;
 
     useEffect(() => {
         if (!unlockAt) return;
@@ -417,36 +528,47 @@ function WaitingPhase() {
     }, [unlockAt, setPhase]);
 
     const handleGiveUp = async () => {
-        const words = session?.words ?? [];
-        const blanks = Array(words.length).fill('');
         setLoading(true);
-        await submitRecall(blanks, 0, 0);
+        await giveUpSession();
         setLoading(false);
         setShowGiveUpConfirm(false);
-        setPhase('result');
+        setPhase('viewing');
     };
 
     return (
         <div className="flex flex-col min-h-screen pb-24 pt-10 px-5">
             <div className="mb-8">
-                <p className="text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--color-gold-dim)' }}>Status</p>
+                <p className="text-xs tracking-[0.3em] uppercase mb-1"
+                    style={{ color: isWeekly ? 'rgba(192,132,252,0.7)' : 'var(--color-gold-dim)' }}>Status</p>
                 <h2 className="text-3xl font-black text-display" style={{ lineHeight: 1.1 }}>
-                    Consolidando<br /><span className="text-gradient-gold">Memória</span>
+                    Consolidando<br /><span style={{
+                        background: isWeekly ? 'linear-gradient(90deg,#A855F7,#C084FC)' : undefined,
+                        WebkitBackgroundClip: isWeekly ? 'text' : undefined,
+                        WebkitTextFillColor: isWeekly ? 'transparent' : undefined,
+                    }} className={isWeekly ? '' : 'text-gradient-gold'}>Memória</span>
                 </h2>
                 <p className="text-sm mt-3" style={{ color: 'var(--color-text-sub)' }}>
-                    Seu hipocampo está fixando as palavras. Aguarde o período de consolidação.
+                    {isWeekly
+                        ? 'Seu desafio semanal está ativo. Aguarde 1 semana e volte para testar sua memória!'
+                        : 'Seu hipocampo está fixando as palavras. Aguarde o período de consolidação.'}
                 </p>
             </div>
 
             <div className="panel p-6 mb-5 flex flex-col items-center"
-                style={{ border: '1px solid var(--color-border-glow)' }}>
-                <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--color-text-muted)' }}>
+                style={isWeekly ? {
+                    border: '1px solid rgba(168,85,247,0.5)',
+                    boxShadow: '0 0 32px rgba(168,85,247,0.12)',
+                    background: 'linear-gradient(135deg, rgba(88,28,135,0.18), rgba(124,58,237,0.08))'
+                } : { border: '1px solid var(--color-border-glow)' }}>
+                <p className="text-xs font-bold uppercase tracking-widest mb-5"
+                    style={{ color: isWeekly ? 'rgba(192,132,252,0.7)' : 'var(--color-text-muted)' }}>
                     Liberação em
                 </p>
                 <Timer
                     targetTimestamp={unlockAt ?? Date.now() + 86400000}
                     onFinish={() => setPhase('recall')}
                     size={200}
+                    purple={isWeekly}
                 />
 
                 {/* Give up button inside timer panel */}
@@ -459,7 +581,8 @@ function WaitingPhase() {
             </div>
 
             {session && (
-                <div className="panel p-4 mb-4">
+                <div className="panel p-4 mb-4"
+                    style={isWeekly ? { border: '1px solid rgba(168,85,247,0.25)' } : {}}>
                     <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-muted)' }}>
                         {session.words.length} palavras bloqueadas
                     </p>
@@ -475,8 +598,11 @@ function WaitingPhase() {
             )}
 
             <div className="rounded-2xl p-4 mb-2"
-                style={{ background: 'var(--color-gold-soft)', border: '1px solid rgba(212,168,83,0.2)' }}>
-                <p className="text-xs font-bold mb-2 text-gold">Enquanto espera:</p>
+                style={isWeekly ? {
+                    background: 'rgba(88,28,135,0.1)',
+                    border: '1px solid rgba(168,85,247,0.2)'
+                } : { background: 'var(--color-gold-soft)', border: '1px solid rgba(212,168,83,0.2)' }}>
+                <p className="text-xs font-bold mb-2" style={{ color: isWeekly ? '#A855F7' : 'var(--color-gold)' }}>Enquanto espera:</p>
                 <ul className="text-xs space-y-1" style={{ color: 'var(--color-text-sub)' }}>
                     <li>• Explore a loja e personalize seu avatar</li>
                     <li>• Veja o ranking e desafie amigos</li>
@@ -484,50 +610,53 @@ function WaitingPhase() {
                 </ul>
             </div>
 
-            {/* Give up confirmation modal */}
-            <AnimatePresence>
-                {showGiveUpConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-5"
-                        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-                        onClick={() => setShowGiveUpConfirm(false)}>
+            {/* Give up confirmation modal — portal so fixed escapes HorizontalCanvas transform */}
+            {createPortal(
+                <AnimatePresence>
+                    {showGiveUpConfirm && (
                         <motion.div
-                            initial={{ y: 60, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: 60, opacity: 0 }}
-                            transition={{ type: 'spring', damping: 24, stiffness: 280 }}
-                            className="panel p-6 w-full max-w-sm space-y-5"
-                            style={{ border: '1px solid rgba(248,113,113,0.25)' }}
-                            onClick={e => e.stopPropagation()}>
-                            <div className="text-center">
-                                <p className="text-3xl mb-2">🏳️</p>
-                                <h3 className="text-lg font-black text-white">Desistir da sessão?</h3>
-                                <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-                                    Você admite que esqueceu as palavras.<br />
-                                    Sua sequência pode ser perdida e você não ganhará Nous.
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={() => setShowGiveUpConfirm(false)}
-                                    className="btn-ghost py-3 text-sm">
-                                    Voltar
-                                </button>
-                                <button
-                                    onClick={handleGiveUp}
-                                    disabled={loading}
-                                    className="py-3 rounded-xl text-sm font-black border transition-all"
-                                    style={{ color: '#F87171', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)' }}>
-                                    {loading ? 'Salvando...' : 'Confirmar'}
-                                </button>
-                            </div>
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-5"
+                            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+                            onClick={() => setShowGiveUpConfirm(false)}>
+                            <motion.div
+                                initial={{ y: 60, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                exit={{ y: 60, opacity: 0 }}
+                                transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+                                className="panel p-6 w-full max-w-sm space-y-5"
+                                style={{ border: '1px solid rgba(248,113,113,0.25)' }}
+                                onClick={e => e.stopPropagation()}>
+                                <div className="text-center">
+                                    <p className="text-3xl mb-2">🏳️</p>
+                                    <h3 className="text-lg font-black text-white">Desistir da sessão?</h3>
+                                    <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                                        Você admite que esqueceu as palavras.<br />
+                                        Sua sequência pode ser perdida e você não ganhará Nous.
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={() => setShowGiveUpConfirm(false)}
+                                        className="btn-ghost py-3 text-sm">
+                                        Voltar
+                                    </button>
+                                    <button
+                                        onClick={handleGiveUp}
+                                        disabled={loading}
+                                        className="py-3 rounded-xl text-sm font-black border transition-all"
+                                        style={{ color: '#F87171', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)' }}>
+                                        {loading ? 'Salvando...' : 'Confirmar'}
+                                    </button>
+                                </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 }
@@ -670,7 +799,8 @@ function RecallPhase() {
 
 // ─── Result Phase ─────────────────────────────────────────────────────────────
 function ResultPhase() {
-    const { profile, setPhase, setSession, setUnlockAt } = useGameStore();
+    const { profile, setPhase, setSession, setUnlockAt, challengeHours } = useGameStore();
+    const isWeekly = challengeHours === 168;
 
     const handleReset = () => {
         setSession(null);
@@ -682,18 +812,41 @@ function ResultPhase() {
         <div className="flex flex-col items-center justify-center min-h-screen px-5 pb-24">
             {/* Trophy icon */}
             <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                className="mb-6 flex items-center justify-center w-20 h-20 rounded"
-                style={{ background: 'rgba(212,168,83,0.12)', border: '1px solid rgba(212,168,83,0.3)' }}>
-                <Star size={36} strokeWidth={1.2} style={{ color: 'var(--color-gold)' }} />
+                className="mb-6 flex items-center justify-center w-20 h-20 rounded-2xl"
+                style={isWeekly ? {
+                    background: 'rgba(168,85,247,0.14)',
+                    border: '1px solid rgba(168,85,247,0.4)',
+                    boxShadow: '0 0 30px rgba(168,85,247,0.2)'
+                } : {
+                    background: 'rgba(212,168,83,0.12)',
+                    border: '1px solid rgba(212,168,83,0.3)'
+                }}>
+                {isWeekly
+                    ? <span className="text-4xl">👑</span>
+                    : <Star size={36} strokeWidth={1.2} style={{ color: 'var(--color-gold)' }} />}
             </motion.div>
 
-            <h2 className="text-3xl font-black text-display text-center mb-2">Sessão Concluída!</h2>
+            <h2 className="text-3xl font-black text-display text-center mb-2">
+                {isWeekly ? 'Desafio Semanal' : 'Sessão'}{' '}
+                <span style={isWeekly ? {
+                    background: 'linear-gradient(90deg,#A855F7,#C084FC)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                } : {}} className={isWeekly ? '' : 'text-white'}>Concluído!</span>
+            </h2>
             <p className="text-sm text-center mb-8" style={{ color: 'var(--color-text-sub)' }}>
-                Seu hipocampo fixou as memórias. Volte amanhã para o próximo desafio.
+                {isWeekly
+                    ? 'Incrível! Você completou o desafio semanal de memória!'
+                    : 'Seu hipocampo fixou as memórias. Volte amanhã para o próximo desafio.'}
             </p>
 
             {/* Stats panel */}
-            <div className="panel p-6 w-full max-w-xs mb-8" style={{ border: '1px solid var(--color-border-glow)' }}>
+            <div className="panel p-6 w-full max-w-xs mb-8"
+                style={isWeekly ? {
+                    border: '1px solid rgba(168,85,247,0.4)',
+                    boxShadow: '0 0 24px rgba(168,85,247,0.1)',
+                    background: 'linear-gradient(135deg, rgba(88,28,135,0.18), rgba(124,58,237,0.08))'
+                } : { border: '1px solid var(--color-border-glow)' }}>
                 <div className="flex items-center justify-center gap-6">
                     <div className="text-center">
                         <div className="flex items-center justify-center gap-1.5 mb-1">
@@ -713,8 +866,16 @@ function ResultPhase() {
                 </div>
             </div>
 
-            {/* Continue — available to all users */}
-            <button onClick={handleReset} className="btn-gold w-full max-w-xs flex items-center justify-center gap-2">
+            {/* Continue */}
+            <button onClick={handleReset}
+                className={isWeekly
+                    ? 'w-full max-w-xs flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-sm transition-all'
+                    : 'btn-gold w-full max-w-xs flex items-center justify-center gap-2'}
+                style={isWeekly ? {
+                    background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
+                    color: '#fff',
+                    boxShadow: '0 4px 20px rgba(168,85,247,0.4)'
+                } : undefined}>
                 CONTINUAR <ChevronRightCircle size={16} />
             </button>
         </div>

@@ -5,6 +5,7 @@ export interface TimerProps {
     onFinish?: () => void;
     size?: number;
     className?: string;
+    purple?: boolean;
 }
 
 function getSecondsLeft(ts: number) { return Math.max(0, Math.floor((ts - Date.now()) / 1000)); }
@@ -18,7 +19,7 @@ function formatTime(s: number) {
     return { h: pad(h), m: pad(m), s: pad(sec) };
 }
 
-export const Timer: React.FC<TimerProps> = ({ targetTimestamp, onFinish, size = 200, className = '' }) => {
+export const Timer: React.FC<TimerProps> = ({ targetTimestamp, onFinish, size = 200, className = '', purple = false }) => {
     const TOTAL = 24 * 3600;
     const [left, setLeft] = useState(() => getSecondsLeft(targetTimestamp));
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -39,13 +40,15 @@ export const Timer: React.FC<TimerProps> = ({ targetTimestamp, onFinish, size = 
     const { h, m, s } = formatTime(left);
     const ratio = Math.min(1, left / TOTAL);
     const cx = size / 2, cy = size / 2;
-    const r = size * 0.44; // expanded track further away to leave center free
+    const r = size * 0.44;
     const circ = 2 * Math.PI * r;
     const dash = `${circ * ratio} ${circ * (1 - ratio)}`;
 
-    // Arc color: gold → orange → red
-    const arcColor = ratio > 0.3 ? '#D4A853' : ratio > 0.1 ? '#F97316' : '#EF4444';
-    const arcGlow = ratio > 0.3 ? 'rgba(212,168,83,0.5)' : ratio > 0.1 ? 'rgba(249,115,22,0.5)' : 'rgba(239,68,68,0.5)';
+    // Arc color: purple mode or gold→orange→red
+    const arcColor = purple ? '#A855F7'
+        : ratio > 0.3 ? '#D4A853' : ratio > 0.1 ? '#F97316' : '#EF4444';
+    const arcGlow = purple ? 'rgba(168,85,247,0.6)'
+        : ratio > 0.3 ? 'rgba(212,168,83,0.5)' : ratio > 0.1 ? 'rgba(249,115,22,0.5)' : 'rgba(239,68,68,0.5)';
 
     return (
         <div className={`inline-flex flex-col items-center ${className}`}>
