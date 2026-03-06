@@ -244,27 +244,28 @@ function ViewingPhase() {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
-                                className="fixed inset-0 z-[100] flex items-center justify-center"
+                                className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 py-6 gap-4"
                                 style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(14px)' }}
                                 onClick={() => setLightboxOpen(false)}>
 
-                                {/* Image Container */}
+                                {/* Image + close */}
                                 <motion.div
                                     key={lightboxIndex}
-                                    initial={{ scale: 0.85, opacity: 0 }}
+                                    initial={{ scale: 0.88, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.85, opacity: 0 }}
+                                    exit={{ scale: 0.88, opacity: 0 }}
                                     transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-                                    className="relative w-full max-w-4xl mx-4"
+                                    className="relative w-full max-w-3xl"
                                     onClick={e => e.stopPropagation()}>
                                     <img
                                         src={banners[lightboxIndex].image_url}
                                         alt={banners[lightboxIndex].title}
-                                        className="w-full h-auto max-h-[82vh] object-contain rounded-xl shadow-2xl"
+                                        className="w-full rounded-xl shadow-2xl object-contain"
+                                        style={{ maxHeight: 'min(60vh, 480px)' }}
                                     />
-                                    {/* Title */}
+                                    {/* Gradient title */}
                                     {banners[lightboxIndex].title && (
-                                        <div className="absolute inset-x-0 bottom-0 px-4 py-3 bg-gradient-to-t from-black/70 to-transparent rounded-b-xl">
+                                        <div className="absolute inset-x-0 bottom-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent rounded-b-xl">
                                             <p className="text-sm font-bold text-white truncate">{banners[lightboxIndex].title}</p>
                                             {banners[lightboxIndex].link_url && (
                                                 <a href={banners[lightboxIndex].link_url} target="_blank" rel="noreferrer"
@@ -277,37 +278,39 @@ function ViewingPhase() {
                                     {/* Close */}
                                     <button
                                         onClick={() => setLightboxOpen(false)}
-                                        className="absolute top-2 right-2 p-2.5 rounded-xl transition-all hover:bg-white/10"
-                                        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                        <X size={18} className="text-white" />
+                                        className="absolute top-2 right-2 p-2 rounded-xl"
+                                        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                                        <X size={16} className="text-white" />
                                     </button>
                                 </motion.div>
 
-                                {/* Prev / Next arrows — outside image container so ESC+outside still work */}
+                                {/* Navigation row (below image on mobile) */}
                                 {banners.length > 1 && (
-                                    <>
+                                    <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
                                         <button
-                                            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + banners.length) % banners.length); }}
-                                            className="fixed left-3 md:left-6 top-1/2 -translate-y-1/2 z-[110] p-3 rounded-xl transition-all hover:bg-white/10"
-                                            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                            <ChevronRight size={22} className="text-white rotate-180" />
+                                            onClick={() => setLightboxIndex(i => (i - 1 + banners.length) % banners.length)}
+                                            className="p-3 rounded-xl"
+                                            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                            <ChevronRight size={20} className="text-white rotate-180" />
                                         </button>
-                                        <button
-                                            onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % banners.length); }}
-                                            className="fixed right-3 md:right-6 top-1/2 -translate-y-1/2 z-[110] p-3 rounded-xl transition-all hover:bg-white/10"
-                                            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                            <ChevronRight size={22} className="text-white" />
-                                        </button>
-                                        {/* Dot indicators */}
-                                        <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-2 z-[110]">
+
+                                        {/* Dots */}
+                                        <div className="flex gap-1.5">
                                             {banners.map((_, i) => (
                                                 <button key={i}
-                                                    onClick={e => { e.stopPropagation(); setLightboxIndex(i); }}
-                                                    className={`h-1.5 rounded-full transition-all duration-300 ${i === lightboxIndex ? 'w-6 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+                                                    onClick={() => setLightboxIndex(i)}
+                                                    className={`h-1.5 rounded-full transition-all duration-300 ${i === lightboxIndex ? 'w-5 bg-white' : 'w-1.5 bg-white/40'}`}
                                                 />
                                             ))}
                                         </div>
-                                    </>
+
+                                        <button
+                                            onClick={() => setLightboxIndex(i => (i + 1) % banners.length)}
+                                            className="p-3 rounded-xl"
+                                            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                            <ChevronRight size={20} className="text-white" />
+                                        </button>
+                                    </div>
                                 )}
                             </motion.div>
                         )}
