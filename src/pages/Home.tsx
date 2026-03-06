@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle } from 'lucide-react';
+import { Lock, CheckCircle2, XCircle, ChevronRight, Flame, Star, ChevronRightCircle, Maximize2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
@@ -21,6 +21,7 @@ function ViewingPhase() {
     const [loading, setLoading] = useState(false);
     const [banners, setBanners] = useState<any[]>([]);
     const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+    const [expandedBanner, setExpandedBanner] = useState<string | null>(null);
 
     // Load stored weekly challenge info
     const weeklyUsedKey = `noesis_weekly_challenge_${new Date().getFullYear()}_${new Date().getMonth()}`;
@@ -78,7 +79,7 @@ function ViewingPhase() {
 
     return (
         <div className="flex flex-col min-h-screen pb-24 max-w-5xl mx-auto w-full">
-            {/* Header */}
+            {/* Header — full width */}
             <div className="px-5 pt-10 pb-6">
                 <div className="flex items-start justify-between">
                     <div>
@@ -101,216 +102,257 @@ function ViewingPhase() {
                 </div>
             </div>
 
-            {/* Fortnite-style Banners Carousel */}
-            {banners.length > 0 && !flipped && (
-                <div className="mb-6 px-5 relative z-10 w-full">
-                    <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg"
-                        style={{ background: 'var(--color-card)' }}>
-                        <AnimatePresence mode="popLayout">
+            {/* 2-column layout on desktop */}
+            <div className="flex flex-col md:flex-row gap-6 px-5 flex-1 items-start">
+
+                {/* ── Center: cards + CTA + Timer ── */}
+                <div className="flex-1 space-y-5 min-w-0">
+
+                    {/* Palace tip (desktop: in center column; mobile: also here) */}
+                    {!flipped && (
+                        <div className="rounded-2xl p-4 flex gap-3 items-start"
+                            style={{ background: 'rgba(91,95,222,0.08)', border: '1px solid rgba(91,95,222,0.2)' }}>
+                            <span className="text-xl">🏛️</span>
+                            <div>
+                                <p className="text-xs font-black mb-1" style={{ color: '#818CF8' }}>Técnica do Palácio</p>
+                                <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-sub)' }}>
+                                    Percorra mentalmente os cômodos da sua casa e coloque uma palavra em cada um. Quanto mais absurda e exagerada a imagem, mais fácil de lembrar!
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cards grid */}
+                    <div className="grid grid-cols-3 gap-3 justify-items-center">
+                        {words.map((word, i) => (
+                            <motion.div key={`${word}-${i}`}
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.04 }}>
+                                <MemoryCard word={word} isHidden={flipped} />
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    {/* CTA */}
+                    <div>
+                        {!flipped ? (
+                            <div className="space-y-3">
+                                <button onClick={handleFlip} disabled={loading} className="btn-gold w-full flex items-center justify-center gap-2">
+                                    {loading ? 'Iniciando...' : <>VIRAR CARTAS <ChevronRight size={16} /></>}
+                                </button>
+                                <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                                    Memorize todas as palavras antes de virar
+                                </p>
+                            </div>
+                        ) : (
+                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                                className="panel p-4 text-center"
+                                style={{ border: '1px solid rgba(212,168,83,0.3)', background: 'rgba(212,168,83,0.05)' }}>
+                                <p className="font-black text-sm text-gradient-gold">Cronômetro iniciado</p>
+                                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                                    As cartas estão guardadas. O teste inicia quando o tempo acabar.
+                                </p>
+                            </motion.div>
+                        )}
+                    </div>
+
+                    {/* Timer (after flip) */}
+                    {flipped && (
+                        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                            className="flex flex-col items-center">
+                            <div className="panel p-6 w-full flex flex-col items-center"
+                                style={{ border: '1px solid var(--color-border-glow)' }}>
+                                <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--color-text-muted)' }}>
+                                    Liberação em
+                                </p>
+                                <Timer
+                                    targetTimestamp={(useGameStore.getState().unlockAt) ?? Date.now() + 86400000}
+                                    onFinish={() => useGameStore.getState().setPhase('recall')}
+                                    size={180}
+                                />
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+
+                {/* ── Right sidebar: carousel + settings ── */}
+                <div className="w-full md:w-72 lg:w-80 space-y-4 md:sticky md:top-5">
+
+                    {/* Banners carousel */}
+                    {banners.length > 0 && !flipped && (
+                        <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-[var(--color-glass-strong)] shadow-lg"
+                            style={{ background: 'var(--color-card)' }}>
+                            <AnimatePresence mode="popLayout">
+                                <motion.div
+                                    key={currentBannerIndex}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="absolute inset-0 cursor-pointer"
+                                    onClick={() => {
+                                        if (banners[currentBannerIndex].link_url) {
+                                            window.open(banners[currentBannerIndex].link_url, '_blank');
+                                        }
+                                    }}
+                                >
+                                    <img src={banners[currentBannerIndex].image_url} alt={banners[currentBannerIndex].title} className="w-full h-full object-cover" />
+                                </motion.div>
+                            </AnimatePresence>
+                            <div className="absolute inset-x-0 bottom-0 p-4 pb-6 bg-gradient-to-t from-[var(--color-overlay-heavy)] via-[var(--color-overlay)] to-transparent pointer-events-none">
+                                <AnimatePresence mode="popLayout">
+                                    <motion.p
+                                        key={currentBannerIndex}
+                                        initial={{ y: 5, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        exit={{ y: -5, opacity: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="text-sm sm:text-base font-bold text-white shadow-black drop-shadow-md truncate pointer-events-none"
+                                    >
+                                        {banners[currentBannerIndex].title}
+                                    </motion.p>
+                                </AnimatePresence>
+                            </div>
+                            {/* Expand button bottom-right */}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setExpandedBanner(banners[currentBannerIndex].image_url); }}
+                                className="absolute bottom-3 right-3 z-30 p-1.5 rounded-lg transition-all"
+                                style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.15)' }}
+                                title="Ampliar">
+                                <Maximize2 size={13} className="text-white/80" />
+                            </button>
+                            {banners.length > 1 && (
+                                <div className="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-20">
+                                    {banners.map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setCurrentBannerIndex(i)}
+                                            className={`h-1.5 rounded-full transition-all duration-300 ${i === currentBannerIndex ? 'w-5 bg-white shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'w-1.5 bg-white/40 hover:bg-white/70'}`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Fullscreen Lightbox */}
+                    <AnimatePresence>
+                        {expandedBanner && (
                             <motion.div
-                                key={currentBannerIndex}
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                transition={{ duration: 0.5 }}
-                                className="absolute inset-0 cursor-pointer"
-                                onClick={() => {
-                                    if (banners[currentBannerIndex].link_url) {
-                                        window.open(banners[currentBannerIndex].link_url, '_blank');
-                                    }
-                                }}
-                            >
-                                <img src={banners[currentBannerIndex].image_url} alt={banners[currentBannerIndex].title} className="w-full h-full object-cover" />
-                            </motion.div>
-                        </AnimatePresence>
-
-                        <div className="absolute inset-x-0 bottom-0 p-4 pb-6 bg-gradient-to-t from-[var(--color-overlay-heavy)] via-[var(--color-overlay)] to-transparent pointer-events-none">
-                            <AnimatePresence mode="popLayout">
-                                <motion.p
-                                    key={currentBannerIndex}
-                                    initial={{ y: 5, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    exit={{ y: -5, opacity: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="text-sm sm:text-base font-bold text-white shadow-black drop-shadow-md truncate pointer-events-none"
-                                >
-                                    {banners[currentBannerIndex].title}
-                                </motion.p>
-                            </AnimatePresence>
-                        </div>
-
-                        {/* Dots pagination */}
-                        {banners.length > 1 && (
-                            <div className="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-20">
-                                {banners.map((_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => setCurrentBannerIndex(i)}
-                                        className={`h-1.5 rounded-full transition-all duration-300 ${i === currentBannerIndex ? 'w-5 bg-white shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'w-1.5 bg-white/40 hover:bg-white/70'}`}
+                                transition={{ duration: 0.22 }}
+                                className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10"
+                                style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)' }}
+                                onClick={() => setExpandedBanner(null)}>
+                                <motion.div
+                                    initial={{ scale: 0.82, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.82, opacity: 0 }}
+                                    transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+                                    className="relative max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl"
+                                    onClick={e => e.stopPropagation()}>
+                                    <img
+                                        src={expandedBanner}
+                                        alt="Banner ampliado"
+                                        className="w-full h-auto max-h-[80vh] object-contain"
+                                        style={{ background: 'var(--color-card)' }}
                                     />
+                                    <button
+                                        onClick={() => setExpandedBanner(null)}
+                                        className="absolute top-3 right-3 p-2 rounded-xl transition-all"
+                                        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                        <X size={18} className="text-white" />
+                                    </button>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Challenge time */}
+                    {!flipped && (
+                        <div className="panel p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                                    ⚡ Tempo de Desafio
+                                </p>
+                                <span className="text-lg font-black text-gradient-gold">
+                                    +{challengeReward} <img src={coinImg} className="inline w-3.5 h-3.5 object-contain mb-0.5" alt="" />
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {CHALLENGE_OPTIONS.map(opt => {
+                                    const isSelected = challengeHours === opt.hours;
+                                    const isDisabled = opt.weekly && weeklyAlreadyUsed;
+                                    return (
+                                        <button
+                                            key={opt.hours}
+                                            disabled={isDisabled}
+                                            onClick={() => { setChallengeHours(opt.hours); setChallengeReward(opt.reward); audio.play('nav'); }}
+                                            className="flex flex-col items-center px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 relative"
+                                            style={{
+                                                background: isSelected
+                                                    ? (opt.weekly ? 'linear-gradient(135deg, #7C3AED, #A855F7)' : 'linear-gradient(135deg, #C49333, #E8B84B)')
+                                                    : 'var(--color-glass)',
+                                                color: isSelected ? '#0D0F1C' : (opt.weekly ? '#A855F7' : 'var(--color-text-muted)'),
+                                                border: isSelected ? 'none' : (opt.weekly ? '1px solid rgba(168,85,247,0.3)' : '1px solid var(--color-border)'),
+                                                opacity: isDisabled ? 0.4 : 1,
+                                                minWidth: 52,
+                                            }}
+                                        >
+                                            <span>{opt.label}</span>
+                                            <span className="text-[9px] mt-0.5 opacity-80">+{opt.reward}🪙</span>
+                                            {opt.weekly && (
+                                                <span className="absolute -top-2 -right-1 text-[8px] font-black px-1 rounded-full"
+                                                    style={{ background: '#7C3AED', color: 'white' }}>
+                                                    {isDisabled ? '✓ usado' : '1×/mês'}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                                Espere o tempo e acerte todas as palavras para ganhar os Nous!
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Word count */}
+                    <div className="panel p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                                    Palavras por sessão
+                                </p>
+                                {flipped && <Lock size={12} style={{ color: 'var(--color-gold-dim)' }} />}
+                            </div>
+                            <span className="text-xl font-black text-gradient-gold">{wordCount}</span>
+                        </div>
+                        {flipped ? (
+                            <div className="rounded-xl p-2.5 text-xs" style={{ background: 'rgba(212,168,83,0.07)', border: '1px solid rgba(212,168,83,0.15)', color: 'var(--color-gold-dim)' }}>
+                                🔒 Quantidade fixa até amanhã. Mude após o resultado de hoje.
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                                {WORD_COUNT_OPTIONS.map(n => (
+                                    <button key={n} onClick={() => setWordCount(n)}
+                                        className="px-3 py-1.5 rounded-xl text-xs font-black transition-all duration-150"
+                                        style={{
+                                            background: wordCount === n ? 'linear-gradient(135deg, #C49333, #E8B84B)' : 'var(--color-glass)',
+                                            color: wordCount === n ? '#0D0F1C' : 'var(--color-text-muted)',
+                                            border: wordCount === n ? 'none' : '1px solid var(--color-border)',
+                                        }}>
+                                        {n}
+                                    </button>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
-            )}
-
-            {/* Challenge time selector — locked after flip */}
-            {!flipped && (
-                <div className="px-5 mb-5">
-                    <div className="panel p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                                ⚡ Tempo de Desafio
-                            </p>
-                            <span className="text-lg font-black text-gradient-gold">
-                                +{challengeReward} <img src={coinImg} className="inline w-3.5 h-3.5 object-contain mb-0.5" alt="" />
-                            </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {CHALLENGE_OPTIONS.map(opt => {
-                                const isSelected = challengeHours === opt.hours;
-                                const isDisabled = opt.weekly && weeklyAlreadyUsed;
-                                return (
-                                    <button
-                                        key={opt.hours}
-                                        disabled={isDisabled}
-                                        onClick={() => { setChallengeHours(opt.hours); setChallengeReward(opt.reward); audio.play('nav'); }}
-                                        className="flex flex-col items-center px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 relative"
-                                        style={{
-                                            background: isSelected
-                                                ? (opt.weekly ? 'linear-gradient(135deg, #7C3AED, #A855F7)' : 'linear-gradient(135deg, #C49333, #E8B84B)')
-                                                : 'var(--color-glass)',
-                                            color: isSelected ? '#0D0F1C' : (opt.weekly ? '#A855F7' : 'var(--color-text-muted)'),
-                                            border: isSelected ? 'none' : (opt.weekly ? '1px solid rgba(168,85,247,0.3)' : '1px solid var(--color-border)'),
-                                            opacity: isDisabled ? 0.4 : 1,
-                                            minWidth: 52,
-                                        }}
-                                    >
-                                        <span>{opt.label}</span>
-                                        <span className="text-[9px] mt-0.5 opacity-80">+{opt.reward}🪙</span>
-                                        {opt.weekly && (
-                                            <span className="absolute -top-2 -right-1 text-[8px] font-black px-1 rounded-full"
-                                                style={{ background: '#7C3AED', color: 'white' }}>
-                                                {isDisabled ? '✓ usado' : '1×/mês'}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
-                            Espere o tempo e acerte todas as palavras para ganhar os Nous!
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            <div className="px-5 mb-5">
-                <div className="panel p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                                Palavras por sessão
-                            </p>
-                            {flipped && <Lock size={12} style={{ color: 'var(--color-gold-dim)' }} />}
-                        </div>
-                        <span className="text-xl font-black text-gradient-gold">{wordCount}</span>
-                    </div>
-
-                    {flipped ? (
-                        // Locked state
-                        <div className="rounded-xl p-2.5 text-xs" style={{ background: 'rgba(212,168,83,0.07)', border: '1px solid rgba(212,168,83,0.15)', color: 'var(--color-gold-dim)' }}>
-                            🔒 Quantidade fixa até amanhã. Mude após o resultado de hoje.
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                            {WORD_COUNT_OPTIONS.map(n => (
-                                <button key={n} onClick={() => setWordCount(n)}
-                                    className="px-3 py-1.5 rounded-xl text-xs font-black transition-all duration-150"
-                                    style={{
-                                        background: wordCount === n ? 'linear-gradient(135deg, #C49333, #E8B84B)' : 'var(--color-glass)',
-                                        color: wordCount === n ? '#0D0F1C' : 'var(--color-text-muted)',
-                                        border: wordCount === n ? 'none' : '1px solid var(--color-border)',
-                                    }}>
-                                    {n}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
             </div>
-
-            {/* Palace tip */}
-            {!flipped && (
-                <div className="px-5 mb-5">
-                    <div className="rounded-2xl p-4 flex gap-3 items-start"
-                        style={{ background: 'rgba(91,95,222,0.08)', border: '1px solid rgba(91,95,222,0.2)' }}>
-                        <span className="text-xl">🏛️</span>
-                        <div>
-                            <p className="text-xs font-black mb-1" style={{ color: '#818CF8' }}>Técnica do Palácio</p>
-                            <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-sub)' }}>
-                                Percorra mentalmente os cômodos da sua casa e coloque uma palavra em cada um. Quanto mais absurda e exagerada a imagem, mais fácil de lembrar!
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Cards grid */}
-            <div className="px-5 mb-6">
-                <div className="grid grid-cols-3 gap-3 justify-items-center">
-                    {words.map((word, i) => (
-                        <motion.div key={`${word}-${i}`}
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.04 }}>
-                            <MemoryCard word={word} isHidden={flipped} />
-                        </motion.div>
-                    ))}
-                </div>
-            </div>
-
-            {/* CTA: Virar Cartas */}
-            <div className="px-5">
-                {!flipped ? (
-                    <div className="space-y-3">
-                        <button onClick={handleFlip} disabled={loading} className="btn-gold w-full flex items-center justify-center gap-2">
-                            {loading ? 'Iniciando...' : <>VIRAR CARTAS <ChevronRight size={16} /></>}
-                        </button>
-                        <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                            Memorize todas as palavras antes de virar
-                        </p>
-                    </div>
-                ) : (
-                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                        className="panel p-4 text-center"
-                        style={{ border: '1px solid rgba(212,168,83,0.3)', background: 'rgba(212,168,83,0.05)' }}>
-                        <p className="font-black text-sm text-gradient-gold">Cronômetro iniciado</p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                            As cartas estão guardadas. O teste inicia quando o tempo acabar.
-                        </p>
-                    </motion.div>
-                )}
-            </div>
-
-            {/* Timer visible after flip — cards stay visible above */}
-            {flipped && (
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                    className="px-5 mt-5 flex flex-col items-center">
-                    <div className="panel p-6 w-full flex flex-col items-center"
-                        style={{ border: '1px solid var(--color-border-glow)' }}>
-                        <p className="text-xs font-bold uppercase tracking-widest mb-5" style={{ color: 'var(--color-text-muted)' }}>
-                            Liberação em
-                        </p>
-                        <Timer
-                            targetTimestamp={(useGameStore.getState().unlockAt) ?? Date.now() + 86400000}
-                            onFinish={() => useGameStore.getState().setPhase('recall')}
-                            size={180}
-                        />
-                    </div>
-                </motion.div>
-            )}
         </div>
     );
 }
