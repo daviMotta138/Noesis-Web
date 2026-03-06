@@ -1,6 +1,0 @@
-com.noesis.app.test.app-jetified-annotation-experimental-1.4.1-0 C:\Users\joaol\.gradle\caches\9.0.0\transforms\abfe23fcbedf566b1d268dd48e3436cf\transformed\jetified-annotation-experimental-1.4.1\res
-com.noesis.app.test.app-jetified-core-1.5.0-1 C:\Users\joaol\.gradle\caches\9.0.0\transforms\c190a7db6632222d7f17d92d9bc948d7\transformed\jetified-core-1.5.0\res
-com.noesis.app.test.app-androidTest-2 C:\Users\joaol\OneDrive\Desktop\Noesis\android\app\build\generated\res\resValues\androidTest\debug
-com.noesis.app.test.app-mergeDebugAndroidTestResources-3 C:\Users\joaol\OneDrive\Desktop\Noesis\android\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
-com.noesis.app.test.app-mergeDebugAndroidTestResources-4 C:\Users\joaol\OneDrive\Desktop\Noesis\android\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
-com.noesis.app.test.app-debugAndroidTest-5 C:\Users\joaol\OneDrive\Desktop\Noesis\android\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources

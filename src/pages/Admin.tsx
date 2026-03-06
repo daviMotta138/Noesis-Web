@@ -220,72 +220,256 @@ function UsersTab({ addLog }: { addLog: (m: string) => void }) {
     );
 }
 
-// ── 3. Time Control Tab (Legacy logic ported) ──
+// ── 3. Time Control Tab ──
 function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActiveSession, fetchProfile }: any) {
-    // ── Timer: skip to recall immediately ──
+    // ── Admin's own session shortcuts ──────────────────────────────────────
     const handleSkipTimer = async () => {
         if (!session || !user) { addLog('Sem sessão ativa para avançar.'); return; }
         const now = Date.now() - 1000;
         await supabase.from('daily_sessions').update({ unlocks_at: new Date(now).toISOString() }).eq('id', session.id);
         setUnlockAt(now); setPhase('recall'); addLog(`✓ Cronômetro avançado → Fase: recall`);
     };
-
-    // ── Timer: set to 10 seconds from now ──
     const handleSetShort = async () => {
         if (!session || !user) { addLog('Sem sessão ativa.'); return; }
         const ts = Date.now() + 10_000;
         await supabase.from('daily_sessions').update({ unlocks_at: new Date(ts).toISOString() }).eq('id', session.id);
         setUnlockAt(ts); setPhase('waiting'); addLog('✓ Cronômetro → 10 segundos');
     };
-
     const handleResetSession = async () => {
         if (!session) { addLog('Sem sessão para resetar.'); return; }
         await supabase.from('daily_sessions').delete().eq('id', session.id);
         setPhase('viewing'); setUnlockAt(null); addLog('✓ Sessão deletada → fase: viewing');
     };
-
     const handleReload = async () => {
-        if (user?.id) {
-            await loadActiveSession(user.id); await fetchProfile(user.id); addLog('✓ Session e perfil recarregados');
-        }
+        if (user?.id) { await loadActiveSession(user.id); await fetchProfile(user.id); addLog('✓ Session e perfil recarregados'); }
     };
 
+    // ── User session picker ─────────────────────────────────────────────────
+    const [userSearch, setUserSearch] = useState('');
+    const [foundUsers, setFoundUsers] = useState<any[]>([]);
+    const [selectedUser, setSelectedUser] = useState<any | null>(null);
+    const [targetSession, setTargetSession] = useState<any | null>(null);
+    const [loadingSession, setLoadingSession] = useState(false);
+    const [customMinutes, setCustomMinutes] = useState('60');
+    const [customHours, setCustomHours] = useState('');
+
+    const searchUsers = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        const term = `%${userSearch}%`;
+        const { data } = await supabase
+            .from('profiles')
+            .select('id, display_name, friend_id, avatar_url, streak')
+            .or(`display_name.ilike.${term},friend_id.ilike.${term}`)
+            .limit(10);
+        setFoundUsers(data || []);
+    };
+
+    const selectUser = async (u: any) => {
+        setSelectedUser(u);
+        setFoundUsers([]);
+        setUserSearch(u.display_name);
+        setTargetSession(null);
+        setLoadingSession(true);
+        const { data } = await supabase
+            .from('daily_sessions')
+            .select('*')
+            .eq('user_id', u.id)
+            .is('recalled_at', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        setTargetSession(data || null);
+        setLoadingSession(false);
+        addLog(`✓ Sessão de ${u.display_name} carregada`);
+    };
+
+    const updateTargetSession = async (unlockMs: number) => {
+        if (!targetSession) { addLog('Usuário não tem sessão ativa.'); return; }
+        const iso = new Date(unlockMs).toISOString();
+        const { error } = await supabase
+            .from('daily_sessions')
+            .update({ unlocks_at: iso })
+            .eq('id', targetSession.id);
+        if (error) { addLog(`Erro: ${error.message}`); return; }
+        setTargetSession((s: any) => ({ ...s, unlocks_at: iso }));
+        const remaining = unlockMs > Date.now()
+            ? `${Math.round((unlockMs - Date.now()) / 60000)} min restantes`
+            : 'Liberado agora';
+        addLog(`✓ Timer de ${selectedUser?.display_name} → ${remaining}`);
+    };
+
+    const deleteTargetSession = async () => {
+        if (!targetSession) { addLog('Sem sessão para deletar.'); return; }
+        const { error } = await supabase.from('daily_sessions').delete().eq('id', targetSession.id);
+        if (error) { addLog(`Erro: ${error.message}`); return; }
+        setTargetSession(null);
+        addLog(`✓ Sessão de ${selectedUser?.display_name} deletada`);
+    };
+
+    const unlockNow = () => updateTargetSession(Date.now() - 1000);
+    const setTenSeconds = () => updateTargetSession(Date.now() + 10_000);
+    const setCustomTime = () => {
+        const mins = parseInt(customMinutes) || 0;
+        const hours = parseFloat(customHours) || 0;
+        const ms = (mins + hours * 60) * 60 * 1000;
+        if (ms <= 0) { addLog('Informe um tempo válido.'); return; }
+        updateTargetSession(Date.now() + ms);
+    };
+
+    const unlockAtMs = targetSession ? new Date(targetSession.unlocks_at).getTime() : null;
+    const remainingMs = unlockAtMs ? unlockAtMs - Date.now() : null;
+    const isLocked = remainingMs !== null && remainingMs > 0;
+
     return (
-        <div className="space-y-6">
-            <h3 className="text-2xl font-black text-white">Controle de Testes & Tempo</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="panel p-5 space-y-4">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Status do Admin Atual</p>
-                    <div className="text-sm text-gray-300 grid grid-cols-2 gap-2">
-                        <span className="text-gray-500">Fase Atual:</span> <span className="font-mono text-gold">{phase}</span>
-                        <span className="text-gray-500">ID Sessão:</span> <span className="font-mono truncate">{session?.id ?? 'Nenhuma'}</span>
+        <div className="space-y-8">
+            <h3 className="text-2xl font-black text-white">Controle de Tempo</h3>
+
+            {/* ── User Picker ── */}
+            <div className="panel p-5 space-y-4">
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">
+                    🔍 Selecionar Usuário
+                </p>
+                <form onSubmit={searchUsers} className="flex gap-2">
+                    <div className="flex-1 relative">
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input type="text" value={userSearch} onChange={e => setUserSearch(e.target.value)}
+                            placeholder="Nome ou Friend ID..." className="field w-full pl-10" />
                     </div>
-                </div>
+                    <button type="submit" className="btn-gold px-5">Buscar</button>
+                </form>
 
-                <div className="panel p-5 space-y-4">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Atalhos de Tempo (Shield Test)</p>
-                    <button onClick={handleSkipTimer} className="btn-ghost w-full">Zerar Timer (Pular para Recall)</button>
-                    <button onClick={handleSetShort} className="btn-ghost w-full">Timer para 10 segundos</button>
-                </div>
-
-                <div className="panel p-5 space-y-4">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Forçar Fase Local</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        {['viewing', 'waiting', 'recall', 'result'].map(p => (
-                            <button key={p} onClick={() => { setPhase(p); addLog(`✓ Fase forçada: ${p}`); }} className="btn-ghost text-xs py-2">{p}</button>
+                {/* Search results dropdown */}
+                {foundUsers.length > 0 && (
+                    <div className="rounded-xl overflow-hidden border border-gray-800">
+                        {foundUsers.map(u => (
+                            <button key={u.id} onClick={() => selectUser(u)}
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-gray-800 last:border-0">
+                                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                                    {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <User size={16} className="text-gray-500 m-auto mt-1" />}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-white">{u.display_name}</p>
+                                    <p className="text-xs text-gray-500 font-mono">{u.friend_id} · 🔥{u.streak}</p>
+                                </div>
+                            </button>
                         ))}
                     </div>
+                )}
+            </div>
+
+            {/* ── Selected User's Session ── */}
+            {selectedUser && (
+                <div className="panel p-5 space-y-5" style={{ border: '1px solid rgba(212,168,83,0.25)' }}>
+                    <div className="flex items-center gap-3 border-b border-gray-800 pb-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                            {selectedUser.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover" /> : <User size={18} className="text-gray-500 m-auto mt-1.5" />}
+                        </div>
+                        <div>
+                            <p className="font-black text-white">{selectedUser.display_name}</p>
+                            <p className="text-xs text-gray-500 font-mono">{selectedUser.friend_id}</p>
+                        </div>
+                        <div className="ml-auto text-right">
+                            {loadingSession ? (
+                                <Loader2 size={18} className="animate-spin text-gold" />
+                            ) : targetSession ? (
+                                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${isLocked ? 'bg-amber-500/15 text-amber-400' : 'bg-green-500/15 text-green-400'}`}>
+                                    {isLocked ? `⏳ ${Math.ceil(remainingMs! / 60000)} min restantes` : '✅ Liberado'}
+                                </span>
+                            ) : (
+                                <span className="text-xs text-gray-500">Sem sessão ativa</span>
+                            )}
+                        </div>
+                    </div>
+
+                    {targetSession && (
+                        <>
+                            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                                <div className="bg-gray-900 rounded-lg p-2">
+                                    <p className="text-gray-500 mb-1">Sessão ID</p>
+                                    <p className="text-gray-300 truncate">{targetSession.id.substring(0, 16)}...</p>
+                                </div>
+                                <div className="bg-gray-900 rounded-lg p-2">
+                                    <p className="text-gray-500 mb-1">Libera em</p>
+                                    <p className="text-gray-300">{new Date(targetSession.unlocks_at).toLocaleString('pt-BR')}</p>
+                                </div>
+                                <div className="bg-gray-900 rounded-lg p-2">
+                                    <p className="text-gray-500 mb-1">Palavras</p>
+                                    <p className="text-gray-300">{targetSession.words?.length ?? 0} palavras</p>
+                                </div>
+                                <div className="bg-gray-900 rounded-lg p-2">
+                                    <p className="text-gray-500 mb-1">Criado em</p>
+                                    <p className="text-gray-300">{new Date(targetSession.created_at).toLocaleString('pt-BR')}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Atalhos Rápidos</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={unlockNow} className="btn-gold py-2.5 text-sm font-black">
+                                        ⚡ Liberar Agora
+                                    </button>
+                                    <button onClick={setTenSeconds} className="btn-ghost py-2.5 text-sm">
+                                        ⏱ 10 segundos
+                                    </button>
+                                </div>
+
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-1">Tempo Personalizado</p>
+                                <div className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-gray-500 block mb-1">Minutos</label>
+                                        <input type="number" value={customMinutes} onChange={e => setCustomMinutes(e.target.value)}
+                                            className="field w-full" placeholder="60" min="0" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-[10px] text-gray-500 block mb-1">Horas</label>
+                                        <input type="number" value={customHours} onChange={e => setCustomHours(e.target.value)}
+                                            className="field w-full" placeholder="0" min="0" step="0.5" />
+                                    </div>
+                                    <button onClick={setCustomTime} className="btn-ghost px-4 py-2 text-sm h-[38px]">
+                                        Definir
+                                    </button>
+                                </div>
+
+                                <button onClick={deleteTargetSession}
+                                    className="w-full py-2 rounded-xl text-sm font-bold border transition-all"
+                                    style={{ color: 'var(--color-danger)', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.05)' }}>
+                                    🗑 Deletar Sessão
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {!loadingSession && !targetSession && (
+                        <p className="text-center text-gray-500 text-sm py-4">Este usuário não tem sessão ativa no momento.</p>
+                    )}
+                </div>
+            )}
+
+            {/* ── Admin's own session (legacy tools) ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="panel p-5 space-y-4">
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Meu Status (Admin)</p>
+                    <div className="text-sm text-gray-300 grid grid-cols-2 gap-2">
+                        <span className="text-gray-500">Fase Atual:</span> <span className="font-mono text-gold">{phase}</span>
+                        <span className="text-gray-500">ID Sessão:</span> <span className="font-mono truncate">{session?.id?.substring(0, 8) ?? 'Nenhuma'}...</span>
+                    </div>
                 </div>
 
-                <div className="panel p-5 space-y-4">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Sessão</p>
-                    <button onClick={handleResetSession} className="w-full flex justify-center py-2 rounded-xl text-sm font-bold border transition-all" style={{ color: 'var(--color-danger)', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.05)' }}>Resetar Sessão</button>
-                    <button onClick={handleReload} className="btn-ghost w-full">Forçar Reload Pessoal</button>
+                <div className="panel p-5 space-y-3">
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Atalhos (Minha Sessão)</p>
+                    <button onClick={handleSkipTimer} className="btn-ghost w-full text-sm">Zerar Timer → Recall</button>
+                    <button onClick={handleSetShort} className="btn-ghost w-full text-sm">Timer para 10 segundos</button>
+                    <button onClick={handleResetSession} className="w-full py-2 rounded-xl text-sm font-bold border transition-all"
+                        style={{ color: 'var(--color-danger)', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.05)' }}>
+                        Resetar Minha Sessão
+                    </button>
+                    <button onClick={handleReload} className="btn-ghost w-full text-sm">Forçar Reload</button>
                 </div>
             </div>
         </div>
     );
 }
+
 
 // ── 4. Banners Tab ──
 function BannersTab({ addLog }: { addLog: (m: string) => void }) {

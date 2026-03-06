@@ -31,3 +31,20 @@ cap_add.log
 *.njsproj
 *.sln
 *.sw?
+
+# Android
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/*.hprof
+android/.externalNativeBuild/
+android/.cxx/
+android/app/src/main/assets/capacitor.config.json
+
+# Large files
+*.hprof
+*.apk
+*.zip
+*.tar.gz
+

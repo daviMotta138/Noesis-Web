@@ -1,19 +1,14 @@
 package com.noesis.app;
 
-import androidx.media3.common.Player;
+import android.app.PendingIntent;
+import android.content.Intent;
+import androidx.annotation.Nullable;
+import androidx.media3.common.AudioAttributes;
+import androidx.media3.common.C;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
-import androidx.annotation.Nullable;
 
-/**
- * MediaPlaybackService — exposes the WebView audio element to the Android
- * media notification system (lock screen + notification bar controls).
- *
- * The WebView drives actual playback via the HTML <audio> element.
- * This service registers a MediaSession so Android shows the media
- * notification with play/pause/next/prev controls.
- */
 public class MediaPlaybackService extends MediaSessionService {
     private MediaSession mediaSession = null;
     private ExoPlayer player = null;
@@ -21,8 +16,30 @@ public class MediaPlaybackService extends MediaSessionService {
     @Override
     public void onCreate() {
         super.onCreate();
-        player = new ExoPlayer.Builder(this).build();
-        mediaSession = new MediaSession.Builder(this, player).build();
+        
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build();
+
+        player = new ExoPlayer.Builder(this)
+                .setAudioAttributes(audioAttributes, true)
+                .setHandleAudioBecomingNoisy(true)
+                .build();
+        
+        Intent intent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        mediaSession = new MediaSession.Builder(this, player)
+                .setSessionActivity(pendingIntent)
+                .setCallback(new MediaSession.Callback() {
+                    @Override
+                    public MediaSession.ConnectionResult onConnect(MediaSession session, MediaSession.ControllerInfo controllerInfo) {
+                        return MediaSession.Callback.super.onConnect(session, controllerInfo);
+                    }
+                })
+                .build();
     }
 
     @Nullable

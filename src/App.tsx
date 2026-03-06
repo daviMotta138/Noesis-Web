@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { useGameStore } from './store/useGameStore';
@@ -129,6 +129,8 @@ export default function App() {
   return (
     <div className="min-h-screen relative w-full text-white bg-transparent">
       <StarBackground interactive={!user} />
+      {/* MusicPlayer is at the absolute root — never unmounts */}
+      <MusicPlayer />
 
       {/* ── Boot Splash — overlays everything until auth+profile ready ── */}
       {showSplash && (
@@ -145,11 +147,10 @@ export default function App() {
               </motion.div>
             ) : (
               <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-                <BrowserRouter>
-                  <MusicPlayer />
+                <HashRouter>
                   <ChangelogModal />
                   <AnimatedRoutes />
-                </BrowserRouter>
+                </HashRouter>
               </motion.div>
             )}
           </AnimatePresence>

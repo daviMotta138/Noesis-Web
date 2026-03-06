@@ -1,41 +1,19 @@
 // src/components/HorizontalCanvas.tsx
-// Instagram-style canvas with gesture conflict matrix — no spring bounce
-import { useRef, useEffect, useCallback, useState } from 'react';
+// Drag: direct DOM style.transform (no React re-renders, no JS animation frame)
+// Snap: CSS transition (GPU-accelerated, off the JS thread)
+import { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, useMotionValue, animate } from 'framer-motion';
 
-// ── Canvas pages (index → route)
 export const CANVAS_ROUTES = ['/', '/ranking', '/profile'] as const;
 export type CanvasRoute = typeof CANVAS_ROUTES[number];
 
-const EDGE_ZONE = 18;       // px: left-edge priority zone
-const DIRECTION_THRESHOLD = 8; // px: direction lock threshold
-const SNAP_VELOCITY = 400;   // px/s: velocity threshold for snap
-const SNAP_DISTANCE = 0.38;  // ratio of screen width to trigger snap
-
-type GestureState = {
-    startX: number;
-    startY: number;
-    locked: 'none' | 'horizontal' | 'vertical';
-    isEdgeSwipe: boolean;
-    scrollEl: HTMLElement | null;
-    scrollAtLimit: boolean;
-    t0: number;
-};
+const DIRECTION_THRESHOLD = 12; // px before direction lock
+const SNAP_VELOCITY = 300;       // px/s
+const SNAP_DISTANCE = 0.32;      // fraction of screen width
 
 function getRouteIndex(path: string): number {
     const idx = CANVAS_ROUTES.findIndex(r => r === path);
     return idx >= 0 ? idx : 0;
-}
-
-function findScrollableParent(el: EventTarget | null): HTMLElement | null {
-    let cur = el as HTMLElement | null;
-    while (cur && cur !== document.body) {
-        const overflowX = getComputedStyle(cur).overflowX;
-        if (/(auto|scroll)/.test(overflowX) && cur.scrollWidth > cur.clientWidth) return cur;
-        cur = cur.parentElement;
-    }
-    return null;
 }
 
 interface HorizontalCanvasProps {
@@ -46,132 +24,152 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const containerRef = useRef<HTMLDivElement>(null);
+    const stripRef = useRef<HTMLDivElement>(null);    // the moving strip
     const [activeIdx, setActiveIdx] = useState(() => getRouteIndex(location.pathname));
     const W = window.innerWidth;
 
-    // Framer motion values — plain motion value, NO spring
-    const x = useMotionValue(-activeIdx * W);
-    const gesture = useRef<GestureState | null>(null);
+    // Refs so native handlers always see latest values without re-attaching
+    const activeIdxRef = useRef(activeIdx);
+    const navigateRef = useRef(navigate);
+    const snapToRef = useRef<(idx: number) => void>(() => { });
+    const gestureRef = useRef<{
+        startX: number; startY: number;
+        locked: 'none' | 'horizontal' | 'vertical';
+        isEdgeSwipe: boolean; t0: number;
+    } | null>(null);
 
-    // Sync when route changes externally (e.g. via bottom nav link)
+    useEffect(() => { activeIdxRef.current = activeIdx; }, [activeIdx]);
+    useEffect(() => { navigateRef.current = navigate; }, [navigate]);
+
+    // ── Direct DOM helpers (no React, no Framer Motion) ──────────────────────
+    const setStrip = (px: number, animated: boolean) => {
+        const el = stripRef.current;
+        if (!el) return;
+        el.style.transition = animated ? 'transform 0.26s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none';
+        el.style.transform = `translate3d(${px}px,0,0)`;
+    };
+
+    // Sync on external route change (e.g. bottom nav)
     useEffect(() => {
         const idx = getRouteIndex(location.pathname);
-        if (idx !== activeIdx) {
+        if (idx !== activeIdxRef.current) {
             setActiveIdx(idx);
-            animate(x, -idx * W, { type: 'tween', ease: 'easeOut', duration: 0.28 });
+            activeIdxRef.current = idx;
+            setStrip(-idx * W, true);
         }
     }, [location.pathname]);
 
-    // Navigate to a canvas page by index
-    const snapTo = useCallback((idx: number) => {
-        const clamped = Math.max(0, Math.min(CANVAS_ROUTES.length - 1, idx));
-        setActiveIdx(clamped);
-        animate(x, -clamped * W, { type: 'tween', ease: 'easeOut', duration: 0.28 });
-        navigate(CANVAS_ROUTES[clamped], { replace: true });
-    }, [navigate, x, W]);
+    const snapTo = (idx: number) => {
+        const c = Math.max(0, Math.min(CANVAS_ROUTES.length - 1, idx));
+        setActiveIdx(c);
+        activeIdxRef.current = c;
+        setStrip(-c * W, true); // CSS transition — no JS animation loop
+        navigateRef.current(CANVAS_ROUTES[c], { replace: true });
+    };
+    snapToRef.current = snapTo;
 
-    // ── Touch Handlers ──────────────────────────────────────────
-    const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-        const t = e.touches[0];
-        const scrollEl = findScrollableParent(e.target);
-        const isEdge = t.clientX <= EDGE_ZONE;
-        gesture.current = {
-            startX: t.clientX,
-            startY: t.clientY,
-            locked: 'none',
-            isEdgeSwipe: isEdge,
-            scrollEl,
-            scrollAtLimit: false,
-            t0: performance.now(),
+    // ── Native touch listeners ────────────────────────────────────────────────
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        // Set initial position imperatively (avoids a flash)
+        setStrip(-activeIdxRef.current * W, false);
+
+        const onStart = (e: TouchEvent) => {
+            const t = e.touches[0];
+            gestureRef.current = {
+                startX: t.clientX, startY: t.clientY,
+                locked: 'none',
+                isEdgeSwipe: t.clientX <= 20,
+                t0: performance.now(),
+            };
+            // Kill transition so drag feels instant
+            if (stripRef.current) stripRef.current.style.transition = 'none';
         };
-    }, []);
 
-    const onTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-        if (!gesture.current) return;
-        const g = gesture.current;
-        const t = e.touches[0];
-        const dX = t.clientX - g.startX;
-        const dY = t.clientY - g.startY;
-        const absDX = Math.abs(dX);
-        const absDY = Math.abs(dY);
+        const onMove = (e: TouchEvent) => {
+            const g = gestureRef.current;
+            if (!g) return;
+            const t = e.touches[0];
+            const dX = t.clientX - g.startX;
+            const dY = t.clientY - g.startY;
+            const absDX = Math.abs(dX);
+            const absDY = Math.abs(dY);
 
-        // Direction lock
-        if (g.locked === 'none') {
-            if (absDX < DIRECTION_THRESHOLD && absDY < DIRECTION_THRESHOLD) return;
-            if (g.isEdgeSwipe) {
-                g.locked = 'horizontal'; // edge always horizontal
-            } else if (absDY > absDX) {
-                g.locked = 'vertical';
-                return;
-            } else {
-                g.locked = 'horizontal';
+            if (g.locked === 'none') {
+                if (absDX < DIRECTION_THRESHOLD && absDY < DIRECTION_THRESHOLD) return;
+                if (g.isEdgeSwipe || absDX > absDY * 1.2) {
+                    g.locked = 'horizontal';
+                } else if (absDY > absDX * 1.2) {
+                    g.locked = 'vertical';
+                    gestureRef.current = null; // hand off to inner scroller
+                    return;
+                } else {
+                    return; // ambiguous — wait
+                }
             }
-        }
-        if (g.locked === 'vertical') return;
 
-        // Check if an inner horizontal scroller is at its limit
-        if (g.scrollEl) {
-            const s = g.scrollEl;
-            const atRight = s.scrollLeft + s.clientWidth >= s.scrollWidth - 2;
-            const atLeft = s.scrollLeft <= 2;
-            const goingRight = dX < 0;
-            const goingLeft = dX > 0;
-            g.scrollAtLimit = (goingRight && atRight) || (goingLeft && atLeft);
-            if (!g.scrollAtLimit) return; // inner scroll handles it
-        }
+            // Horizontal: block default scroll, update strip directly in DOM
+            e.preventDefault();
 
-        // We own the gesture — clamp to valid range (no elastic overshoot)
-        e.preventDefault();
-        const base = -activeIdx * W;
-        const minX = -(CANVAS_ROUTES.length - 1) * W;
-        const maxX = 0;
-        // Allow a little drag resistance at the edges but clamp hard
-        const raw = base + dX;
-        const clamped = Math.max(minX, Math.min(maxX, raw));
-        // Add slight resistance when beyond bounds
-        const target = raw < minX ? minX + (raw - minX) * 0.15
-            : raw > maxX ? maxX + (raw - maxX) * 0.15
-                : clamped;
-        x.set(target);
-    }, [activeIdx, x, W]);
+            const base = -activeIdxRef.current * W;
+            const minX = -(CANVAS_ROUTES.length - 1) * W;
+            const maxX = 0;
+            const raw = base + dX;
+            const target = raw < minX ? minX + (raw - minX) * 0.12
+                : raw > maxX ? maxX + (raw - maxX) * 0.12
+                    : raw;
 
-    const onTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-        if (!gesture.current || gesture.current.locked !== 'horizontal') return;
-        const g = gesture.current;
-        gesture.current = null;
+            // Direct style mutation — zero React involvement, zero Framer overhead
+            if (stripRef.current) {
+                stripRef.current.style.transform = `translate3d(${target}px,0,0)`;
+            }
+        };
 
-        const lastTouch = e.changedTouches[0];
-        const dX = lastTouch.clientX - g.startX;
-        const dt = (performance.now() - g.t0) / 1000;
-        const velocity = dX / dt; // px/s
+        const onEnd = (e: TouchEvent) => {
+            const g = gestureRef.current;
+            if (!g || g.locked !== 'horizontal') { gestureRef.current = null; return; }
+            gestureRef.current = null;
 
-        const ratio = Math.abs(dX) / W;
-        const fast = Math.abs(velocity) > SNAP_VELOCITY;
-        const far = ratio > SNAP_DISTANCE;
+            const dX = e.changedTouches[0].clientX - g.startX;
+            const dt = Math.max((performance.now() - g.t0) / 1000, 0.01);
+            const velocity = dX / dt;
+            const currentIdx = activeIdxRef.current;
 
-        if (fast || far) {
-            if (dX < 0) { snapTo(activeIdx + 1); }
-            else { snapTo(activeIdx - 1); }
-        } else {
-            snapTo(activeIdx); // snap back — no bounce
-        }
-    }, [activeIdx, snapTo, W]);
+            if (Math.abs(velocity) > SNAP_VELOCITY || Math.abs(dX) / W > SNAP_DISTANCE) {
+                snapToRef.current(dX < 0 ? currentIdx + 1 : currentIdx - 1);
+            } else {
+                snapToRef.current(currentIdx);
+            }
+        };
+
+        el.addEventListener('touchstart', onStart, { passive: true });
+        el.addEventListener('touchmove', onMove, { passive: false }); // false → can preventDefault
+        el.addEventListener('touchend', onEnd, { passive: true });
+        el.addEventListener('touchcancel', () => { gestureRef.current = null; }, { passive: true });
+
+        return () => {
+            el.removeEventListener('touchstart', onStart);
+            el.removeEventListener('touchmove', onMove);
+            el.removeEventListener('touchend', onEnd);
+        };
+    }, []); // refs keep values fresh without re-attaching
 
     return (
+        // touch-action:none → browser won't claim touches, making preventDefault reliable
         <div
             ref={containerRef}
             className="relative w-screen overflow-hidden"
-            style={{ height: '100dvh' }}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
+            style={{ height: '100dvh', touchAction: 'none' }}
         >
-            <motion.div
+            <div
+                ref={stripRef}
                 style={{
-                    x,
                     display: 'flex',
                     width: `${CANVAS_ROUTES.length * 100}vw`,
                     height: '100%',
+                    willChange: 'transform', // promote to GPU layer
                 }}
             >
                 {children.map((child, i) => (
@@ -182,15 +180,14 @@ export default function HorizontalCanvas({ children }: HorizontalCanvasProps) {
                             height: '100%',
                             overflowY: 'auto',
                             overflowX: 'hidden',
-                            // Virtualize: only render adjacent screens
-                            visibility: Math.abs(i - activeIdx) <= 1 ? 'visible' : 'hidden',
                             flexShrink: 0,
+                            touchAction: 'pan-y', // inner pages: allow vertical scroll
                         }}
                     >
                         {child}
                     </div>
                 ))}
-            </motion.div>
+            </div>
         </div>
     );
 }
