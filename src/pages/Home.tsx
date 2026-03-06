@@ -317,12 +317,25 @@ function ViewingPhase() {
 
 // ─── Waiting Phase ─────────────────────────────────────────────────────────────
 function WaitingPhase() {
-    const { session, unlockAt, setPhase } = useGameStore();
+    const { session, unlockAt, setPhase, submitRecall } = useGameStore();
+    const [showGiveUpConfirm, setShowGiveUpConfirm] = useState(false);
+    const [loading, setLoading] = useState(false);
+
     useEffect(() => {
         if (!unlockAt) return;
         const id = setInterval(() => { if (Date.now() >= unlockAt) setPhase('recall'); }, 5000);
         return () => clearInterval(id);
     }, [unlockAt, setPhase]);
+
+    const handleGiveUp = async () => {
+        const words = session?.words ?? [];
+        const blanks = Array(words.length).fill('');
+        setLoading(true);
+        await submitRecall(blanks, 0, 0);
+        setLoading(false);
+        setShowGiveUpConfirm(false);
+        setPhase('result');
+    };
 
     return (
         <div className="flex flex-col min-h-screen pb-24 pt-10 px-5">
@@ -346,6 +359,14 @@ function WaitingPhase() {
                     onFinish={() => setPhase('recall')}
                     size={200}
                 />
+
+                {/* Give up button inside timer panel */}
+                <button
+                    onClick={() => setShowGiveUpConfirm(true)}
+                    className="mt-6 text-xs font-bold py-2 px-4 rounded-xl border transition-all"
+                    style={{ color: 'var(--color-text-muted)', borderColor: 'var(--color-border)', background: 'transparent' }}>
+                    Desistir desta sessão
+                </button>
             </div>
 
             {session && (
@@ -373,6 +394,51 @@ function WaitingPhase() {
                     <li>• Durma bem — o sono consolida a memória profunda</li>
                 </ul>
             </div>
+
+            {/* Give up confirmation modal */}
+            <AnimatePresence>
+                {showGiveUpConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-5"
+                        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+                        onClick={() => setShowGiveUpConfirm(false)}>
+                        <motion.div
+                            initial={{ y: 60, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 60, opacity: 0 }}
+                            transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+                            className="panel p-6 w-full max-w-sm space-y-5"
+                            style={{ border: '1px solid rgba(248,113,113,0.25)' }}
+                            onClick={e => e.stopPropagation()}>
+                            <div className="text-center">
+                                <p className="text-3xl mb-2">🏳️</p>
+                                <h3 className="text-lg font-black text-white">Desistir da sessão?</h3>
+                                <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                                    Você admite que esqueceu as palavras.<br />
+                                    Sua sequência pode ser perdida e você não ganhará Nous.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setShowGiveUpConfirm(false)}
+                                    className="btn-ghost py-3 text-sm">
+                                    Voltar
+                                </button>
+                                <button
+                                    onClick={handleGiveUp}
+                                    disabled={loading}
+                                    className="py-3 rounded-xl text-sm font-black border transition-all"
+                                    style={{ color: '#F87171', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)' }}>
+                                    {loading ? 'Salvando...' : 'Confirmar'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
@@ -387,7 +453,6 @@ function RecallPhase() {
     const [nousAwarded, setNousAwarded] = useState(0);
     const [loading, setLoading] = useState(false);
     const [shieldUsed, setShieldUsed] = useState(false);
-    const [showGiveUpConfirm, setShowGiveUpConfirm] = useState(false);
 
     const handleSubmit = async () => {
         const res = scoreAnswers(answers.filter(Boolean), words);
@@ -417,17 +482,6 @@ function RecallPhase() {
         setLoading(false);
     };
 
-    const handleGiveUp = async () => {
-        // Submit blank answers — score 0, no Nous
-        audio.play('error');
-        const blankAnswers = Array(words.length).fill('');
-        const res = scoreAnswers(blankAnswers, words);
-        setResults(res); setNousAwarded(0); setSubmitted(true);
-        setLoading(true);
-        await submitRecall(blankAnswers, 0, 0);
-        setLoading(false);
-        setShowGiveUpConfirm(false);
-    };
 
     if (submitted) {
         const correct = results.filter(r => r.correct).length;
@@ -521,70 +575,6 @@ function RecallPhase() {
             <button onClick={handleSubmit} disabled={answers.every(a => !a.trim())} className="btn-gold w-full">
                 VERIFICAR RESPOSTAS
             </button>
-
-            {/* Give up */}
-            <button
-                onClick={() => setShowGiveUpConfirm(true)}
-                className="w-full mt-3 py-2.5 rounded-xl text-xs font-bold border transition-all"
-                style={{ color: 'var(--color-text-muted)', borderColor: 'var(--color-border)', background: 'transparent' }}>
-                Desistir desta sessão
-            </button>
-
-            {/* Confirmation overlay */}
-            <AnimatePresence>
-                {showGiveUpConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-5"
-                        style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-                        onClick={() => setShowGiveUpConfirm(false)}>
-                        <motion.div
-                            initial={{ y: 60, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: 60, opacity: 0 }}
-                            transition={{ type: 'spring', damping: 24, stiffness: 280 }}
-                            className="panel p-6 w-full max-w-sm space-y-4"
-                            style={{ border: '1px solid rgba(248,113,113,0.25)' }}
-                            onClick={e => e.stopPropagation()}>
-                            <div className="text-center">
-                                <p className="text-2xl mb-1">🏳️</p>
-                                <h3 className="text-lg font-black text-white">Desistir da sessão?</h3>
-                                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                                    Sua sequência pode ser perdida e você não ganhará Nous.
-                                </p>
-                            </div>
-                            {/* Show the words the user forgot */}
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>As palavras eram:</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {words.map((w, i) => (
-                                        <span key={i} className="px-2 py-1 rounded-lg text-xs font-bold"
-                                            style={{ background: 'rgba(248,113,113,0.1)', color: '#F87171', border: '1px solid rgba(248,113,113,0.25)' }}>
-                                            {w}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                <button
-                                    onClick={() => setShowGiveUpConfirm(false)}
-                                    className="btn-ghost py-2.5 text-sm">
-                                    Voltar
-                                </button>
-                                <button
-                                    onClick={handleGiveUp}
-                                    disabled={loading}
-                                    className="py-2.5 rounded-xl text-sm font-black border border-danger/30 bg-danger/10 hover:bg-danger/20 transition-all"
-                                    style={{ color: '#F87171' }}>
-                                    {loading ? 'Salvando...' : 'Confirmar'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </div>
     );
 }
