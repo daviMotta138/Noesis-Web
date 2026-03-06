@@ -243,59 +243,62 @@ function ViewingPhase() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-4 py-6 gap-4"
-                                style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(14px)' }}
+                                transition={{ duration: 0.18 }}
+                                className="fixed inset-0 z-[100]"
+                                style={{ background: 'rgba(0,0,0,0.93)', backdropFilter: 'blur(14px)' }}
                                 onClick={() => setLightboxOpen(false)}>
 
-                                {/* Image + close */}
-                                <motion.div
-                                    key={lightboxIndex}
-                                    initial={{ scale: 0.88, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.88, opacity: 0 }}
-                                    transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-                                    className="relative w-full max-w-3xl"
-                                    onClick={e => e.stopPropagation()}>
-                                    <img
-                                        src={banners[lightboxIndex].image_url}
-                                        alt={banners[lightboxIndex].title}
-                                        className="w-full rounded-xl shadow-2xl object-contain"
-                                        style={{ maxHeight: 'min(60vh, 480px)' }}
-                                    />
-                                    {/* Gradient title */}
-                                    {banners[lightboxIndex].title && (
-                                        <div className="absolute inset-x-0 bottom-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent rounded-b-xl">
-                                            <p className="text-sm font-bold text-white truncate">{banners[lightboxIndex].title}</p>
-                                            {banners[lightboxIndex].link_url && (
-                                                <a href={banners[lightboxIndex].link_url} target="_blank" rel="noreferrer"
-                                                    className="text-xs text-blue-400 hover:underline">
-                                                    Abrir link →
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
-                                    {/* Close */}
-                                    <button
-                                        onClick={() => setLightboxOpen(false)}
-                                        className="absolute top-2 right-2 p-2 rounded-xl"
-                                        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                                        <X size={16} className="text-white" />
-                                    </button>
-                                </motion.div>
+                                {/* Close — pinned top-right, always visible */}
+                                <button
+                                    onClick={() => setLightboxOpen(false)}
+                                    className="absolute top-4 right-4 z-10 p-2.5 rounded-xl"
+                                    style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                                    <X size={18} className="text-white" />
+                                </button>
 
-                                {/* Navigation row (below image on mobile) */}
+                                {/* Image area — fixed height, centered, never shifts */}
+                                <div className="absolute inset-x-0 top-12 bottom-20 flex items-center justify-center px-4"
+                                    onClick={() => setLightboxOpen(false)}>
+                                    <motion.div
+                                        key={lightboxIndex}
+                                        initial={{ scale: 0.9, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.9, opacity: 0 }}
+                                        transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+                                        className="relative w-full max-w-3xl h-full"
+                                        onClick={e => e.stopPropagation()}>
+                                        <img
+                                            src={banners[lightboxIndex].image_url}
+                                            alt={banners[lightboxIndex].title}
+                                            className="w-full h-full object-contain rounded-xl shadow-2xl"
+                                        />
+                                        {/* Title overlay */}
+                                        {banners[lightboxIndex].title && (
+                                            <div className="absolute inset-x-0 bottom-0 px-4 py-3 rounded-b-xl"
+                                                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
+                                                <p className="text-sm font-bold text-white truncate">{banners[lightboxIndex].title}</p>
+                                                {banners[lightboxIndex].link_url && (
+                                                    <a href={banners[lightboxIndex].link_url} target="_blank" rel="noreferrer"
+                                                        className="text-xs text-blue-400 hover:underline">
+                                                        Abrir link →
+                                                    </a>
+                                                )}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                </div>
+
+                                {/* Navigation — pinned to bottom, never shifts */}
                                 {banners.length > 1 && (
-                                    <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
+                                    <div className="absolute bottom-0 inset-x-0 h-20 flex items-center justify-center gap-4"
+                                        onClick={e => e.stopPropagation()}>
                                         <button
                                             onClick={() => setLightboxIndex(i => (i - 1 + banners.length) % banners.length)}
                                             className="p-3 rounded-xl"
                                             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
                                             <ChevronRight size={20} className="text-white rotate-180" />
                                         </button>
-
-                                        {/* Dots */}
-                                        <div className="flex gap-1.5">
+                                        <div className="flex gap-1.5 items-center">
                                             {banners.map((_, i) => (
                                                 <button key={i}
                                                     onClick={() => setLightboxIndex(i)}
@@ -303,7 +306,6 @@ function ViewingPhase() {
                                                 />
                                             ))}
                                         </div>
-
                                         <button
                                             onClick={() => setLightboxIndex(i => (i + 1) % banners.length)}
                                             className="p-3 rounded-xl"
