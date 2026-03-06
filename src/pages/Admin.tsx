@@ -253,6 +253,19 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
     const [customMinutes, setCustomMinutes] = useState('60');
     const [customHours, setCustomHours] = useState('');
 
+    // Load initial list of users
+    useEffect(() => {
+        const loadInitialUsers = async () => {
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, display_name, friend_id, avatar_url, streak')
+                .order('created_at', { ascending: false })
+                .limit(50);
+            setFoundUsers(data || []);
+        };
+        loadInitialUsers();
+    }, []);
+
     const searchUsers = async (e?: React.FormEvent) => {
         e?.preventDefault();
         const term = `%${userSearch}%`;
@@ -260,7 +273,7 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
             .from('profiles')
             .select('id, display_name, friend_id, avatar_url, streak')
             .or(`display_name.ilike.${term},friend_id.ilike.${term}`)
-            .limit(10);
+            .limit(foundUsers.length > 10 ? 50 : 10);
         setFoundUsers(data || []);
     };
 
@@ -299,9 +312,9 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
     };
 
     const deleteTargetSession = async () => {
-        if (!targetSession) { addLog('Sem sessão para deletar.'); return; }
+        if (!targetSession) { addLog(`Usuário ${selectedUser?.display_name} não tem sessão para deletar.`); return; }
         const { error } = await supabase.from('daily_sessions').delete().eq('id', targetSession.id);
-        if (error) { addLog(`Erro: ${error.message}`); return; }
+        if (error) { addLog(`Erro ao deletar sessão do usuário: ${error.message}`); return; }
         setTargetSession(null);
         addLog(`✓ Sessão de ${selectedUser?.display_name} deletada`);
     };
@@ -335,26 +348,25 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
                         <input type="text" value={userSearch} onChange={e => setUserSearch(e.target.value)}
                             placeholder="Nome ou Friend ID..." className="field w-full pl-10" />
                     </div>
-                    <button type="submit" className="btn-gold px-5">Buscar</button>
                 </form>
 
-                {/* Search results dropdown */}
-                {foundUsers.length > 0 && (
-                    <div className="rounded-xl overflow-hidden border border-gray-800">
-                        {foundUsers.map(u => (
-                            <button key={u.id} onClick={() => selectUser(u)}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b border-gray-800 last:border-0">
-                                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
-                                    {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <User size={16} className="text-gray-500 m-auto mt-1" />}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-white">{u.display_name}</p>
-                                    <p className="text-xs text-gray-500 font-mono">{u.friend_id} · 🔥{u.streak}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                )}
+                {/* User list */}
+                <div className="rounded-xl overflow-hidden border border-gray-800 max-h-60 overflow-y-auto custom-scrollbar">
+                    {foundUsers.map(u => (
+                        <button key={u.id} onClick={() => selectUser(u)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left border-b border-gray-800 last:border-0 ${selectedUser?.id === u.id ? 'bg-[var(--color-gold)]/10 text-gold' : 'hover:bg-white/5'}`}>
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                                {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : <User size={16} className="text-gray-500 m-auto mt-1" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold truncate">{u.display_name}</p>
+                                <p className="text-[10px] text-gray-500 font-mono">{u.friend_id}</p>
+                            </div>
+                            <div className="text-[10px] font-bold text-gray-600">🔥{u.streak}</div>
+                        </button>
+                    ))}
+                    {foundUsers.length === 0 && <p className="p-4 text-center text-xs text-gray-600">Nenhum usuário encontrado</p>}
+                </div>
             </div>
 
             {/* ── Selected User's Session ── */}
@@ -403,37 +415,39 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
                             </div>
 
                             <div className="space-y-3">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Atalhos Rápidos</p>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" />
+                                    Controle do Usuário
+                                </p>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={unlockNow} className="btn-gold py-2.5 text-sm font-black">
-                                        ⚡ Liberar Agora
+                                    <button onClick={unlockNow} className="btn-gold py-2.5 text-xs font-black">
+                                        ⚡ Liberar {selectedUser.display_name.split(' ')[0]}
                                     </button>
-                                    <button onClick={setTenSeconds} className="btn-ghost py-2.5 text-sm">
-                                        ⏱ 10 segundos
+                                    <button onClick={setTenSeconds} className="btn-ghost py-2.5 text-xs">
+                                        ⏱ 10s para {selectedUser.display_name.split(' ')[0]}
                                     </button>
                                 </div>
 
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-1">Tempo Personalizado</p>
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest pt-1">Tempo Customizado</p>
                                 <div className="flex gap-2 items-end">
                                     <div className="flex-1">
-                                        <label className="text-[10px] text-gray-500 block mb-1">Minutos</label>
+                                        <label className="text-[9px] text-gray-500 block mb-1">Mins</label>
                                         <input type="number" value={customMinutes} onChange={e => setCustomMinutes(e.target.value)}
-                                            className="field w-full" placeholder="60" min="0" />
+                                            className="field w-full text-xs h-9" placeholder="60" min="0" />
                                     </div>
                                     <div className="flex-1">
-                                        <label className="text-[10px] text-gray-500 block mb-1">Horas</label>
+                                        <label className="text-[9px] text-gray-500 block mb-1">Horas</label>
                                         <input type="number" value={customHours} onChange={e => setCustomHours(e.target.value)}
-                                            className="field w-full" placeholder="0" min="0" step="0.5" />
+                                            className="field w-full text-xs h-9" placeholder="0" min="0" step="0.5" />
                                     </div>
-                                    <button onClick={setCustomTime} className="btn-ghost px-4 py-2 text-sm h-[38px]">
-                                        Definir
+                                    <button onClick={setCustomTime} className="btn-ghost px-3 text-xs h-9 font-bold bg-white/5">
+                                        Aplicar
                                     </button>
                                 </div>
 
                                 <button onClick={deleteTargetSession}
-                                    className="w-full py-2 rounded-xl text-sm font-bold border transition-all"
-                                    style={{ color: 'var(--color-danger)', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.05)' }}>
-                                    🗑 Deletar Sessão
+                                    className="w-full py-2 rounded-xl text-xs font-bold border border-danger/20 hover:bg-danger/10 transition-all text-danger">
+                                    🗑 Deletar Sessão do Usuário
                                 </button>
                             </div>
                         </>
