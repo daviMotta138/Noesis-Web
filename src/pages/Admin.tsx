@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Users, Clock, Image as ImageIcon,
-    Search, Trash2, Upload, Shield, Coins, Loader2, User, Music, Bell, Send
+    Search, Trash2, Upload, Shield, Coins, Loader2, User, Music, Bell, Send,
+    RefreshCw, AlertTriangle
 } from 'lucide-react';
 // test utilities
 import { LeaguePromotionTester } from '../components/LeaguePromotionTester';
@@ -221,7 +222,7 @@ function UsersTab({ addLog }: { addLog: (m: string) => void }) {
 }
 
 // ── 3. Time Control Tab ──
-function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActiveSession, fetchProfile }: any) {
+function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt }: any) {
     // ── Admin's own session shortcuts ──────────────────────────────────────
     const handleSkipTimer = async () => {
         if (!session || !user) { addLog('Sem sessão ativa para avançar.'); return; }
@@ -239,9 +240,6 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
         if (!session) { addLog('Não tenho sessão pessoal para resetar.'); return; }
         await supabase.from('daily_sessions').delete().eq('id', session.id);
         setPhase('viewing'); setUnlockAt(null); addLog('✓ Minha sessão deletada → fase: viewing');
-    };
-    const handleReload = async () => {
-        if (user?.id) { await loadActiveSession(user.id); await fetchProfile(user.id); addLog('✓ Session e perfil recarregados'); }
     };
 
     // ── User session picker ─────────────────────────────────────────────────
@@ -281,26 +279,53 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
         setSelectedUser(u);
         setFoundUsers([]);
         setUserSearch(u.display_name);
+        await refreshTargetSession(u.id, u.display_name);
+    };
+
+    const refreshTargetSession = async (uid: string, name: string) => {
         setTargetSession(null);
         setLoadingSession(true);
         const { data, error } = await supabase
             .from('daily_sessions')
             .select('*')
-            .eq('user_id', u.id)
+            .eq('user_id', uid)
             .is('recalled_at', null)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
         if (error) {
-            addLog(`Erro ao carregar sessão de ${u.display_name}: ${error.message}`);
+            addLog(`Erro ao carregar sessão de ${name}: ${error.message}`);
         } else {
             setTargetSession(data || null);
             if (data) {
-                addLog(`✓ Sessão ativa de ${u.display_name} carregada`);
+                addLog(`✓ Sessão ativa de ${name} carregada`);
             } else {
-                addLog(`ℹ ${u.display_name} não possui sessão ativa no momento`);
+                addLog(`ℹ ${name} não possui sessão ativa`);
             }
+        }
+        setLoadingSession(false);
+    };
+
+    const handleCreateManualSession = async () => {
+        if (!selectedUser) return;
+        setLoadingSession(true);
+        const testWords = ["maçã", "livro", "carro", "nuvem", "estrela", "água", "fogo", "vento", "terra", "sono"];
+        const { data, error } = await supabase
+            .from('daily_sessions')
+            .insert({
+                user_id: selectedUser.id,
+                words: testWords,
+                unlocks_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1h standard
+            })
+            .select()
+            .single();
+
+        if (error) {
+            addLog(`Erro ao criar sessão para ${selectedUser.display_name}: ${error.message}`);
+        } else {
+            setTargetSession(data);
+            addLog(`⚡ Sessão de TESTE criada para ${selectedUser.display_name} (1 hora)`);
         }
         setLoadingSession(false);
     };
@@ -389,15 +414,19 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
                             <p className="font-black text-white">{selectedUser.display_name}</p>
                             <p className="text-xs text-gray-500 font-mono">{selectedUser.friend_id}</p>
                         </div>
-                        <div className="ml-auto text-right">
+                        <div className="ml-auto flex items-center gap-3">
+                            <button onClick={() => refreshTargetSession(selectedUser.id, selectedUser.display_name)}
+                                className="p-2 hover:bg-white/5 rounded-lg text-gray-500 transition-colors" title="Atualizar sessão">
+                                <RefreshCw size={16} className={loadingSession ? 'animate-spin text-gold' : ''} />
+                            </button>
                             {loadingSession ? (
                                 <Loader2 size={18} className="animate-spin text-gold" />
                             ) : targetSession ? (
                                 <span className={`text-xs font-bold px-2 py-1 rounded-lg ${isLocked ? 'bg-amber-500/15 text-amber-400' : 'bg-green-500/15 text-green-400'}`}>
-                                    {isLocked ? `⏳ ${Math.ceil(remainingMs! / 60000)} min restantes` : '✅ Liberado'}
+                                    {isLocked ? `⏳ ${Math.ceil(remainingMs! / 60000)} min` : '✅ Pronto'}
                                 </span>
                             ) : (
-                                <span className="text-xs text-gray-500">Sem sessão ativa</span>
+                                <span className="text-xs text-gray-500">Inativo</span>
                             )}
                         </div>
                     </div>
@@ -463,30 +492,44 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt, loadActi
                     )}
 
                     {!loadingSession && !targetSession && (
-                        <p className="text-center text-gray-500 text-sm py-4">Este usuário não tem sessão ativa no momento.</p>
+                        <div className="text-center space-y-4 py-4">
+                            <p className="text-gray-500 text-sm">Este usuário não tem sessão ativa no momento.</p>
+                            <button onClick={handleCreateManualSession}
+                                className="btn-ghost w-full py-3 border-dashed border-gray-700 text-gold font-bold">
+                                ➕ Iniciar Sessão Manual para {selectedUser.display_name.split(' ')[0]}
+                            </button>
+                        </div>
                     )}
                 </div>
             )}
 
-            {/* ── Admin's own session (legacy tools) ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="panel p-5 space-y-4">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Meu Status (Admin)</p>
-                    <div className="text-sm text-gray-300 grid grid-cols-2 gap-2">
-                        <span className="text-gray-500">Fase Atual:</span> <span className="font-mono text-gold">{phase}</span>
-                        <span className="text-gray-500">ID Sessão:</span> <span className="font-mono truncate">{session?.id?.substring(0, 8) ?? 'Nenhuma'}...</span>
-                    </div>
+            {/* ── Admin's own session (Legacy tools isolated) ── */}
+            <div className="mt-12 space-y-4">
+                <div className="flex items-center gap-2 text-red-500/50">
+                    <AlertTriangle size={16} />
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em]">Painel de Controle Pessoal (Admin Only)</p>
                 </div>
 
-                <div className="panel p-5 space-y-3">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-800 pb-2">Atalhos (Minha Sessão)</p>
-                    <button onClick={handleSkipTimer} className="btn-ghost w-full text-sm">Zerar Timer → Recall</button>
-                    <button onClick={handleSetShort} className="btn-ghost w-full text-sm">Timer para 10 segundos</button>
-                    <button onClick={handleResetSession} className="w-full py-2 rounded-xl text-sm font-bold border transition-all"
-                        style={{ color: 'var(--color-danger)', borderColor: 'rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.05)' }}>
-                        Resetar Minha Sessão
-                    </button>
-                    <button onClick={handleReload} className="btn-ghost w-full text-sm">Forçar Reload</button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="panel p-5 space-y-4 bg-red-950/5 border-red-500/10">
+                        <p className="text-sm font-bold text-red-400/60 uppercase tracking-widest border-b border-red-500/10 pb-2">Meu Status</p>
+                        <div className="text-sm text-gray-300 grid grid-cols-2 gap-2">
+                            <span className="text-gray-500">Fase Atual:</span> <span className="font-mono text-gold">{phase}</span>
+                            <span className="text-gray-500">ID Sessão:</span> <span className="font-mono truncate">{session?.id?.substring(0, 8) ?? 'Nenhuma'}...</span>
+                        </div>
+                        <p className="text-[9px] text-gray-600 leading-tight">
+                            ⚠️ Estas ferramentas afetam apenas a sua conta de desenvolvedor conectada.
+                        </p>
+                    </div>
+
+                    <div className="panel p-5 space-y-3 bg-red-950/5 border-red-500/10">
+                        <p className="text-sm font-bold text-red-400/60 uppercase tracking-widest border-b border-red-500/10 pb-2">Meus Atalhos</p>
+                        <button onClick={handleSkipTimer} className="btn-ghost w-full text-xs opacity-70 hover:opacity-100 border-red-500/10">Pular Meu Timer → Recall</button>
+                        <button onClick={handleSetShort} className="btn-ghost w-full text-xs opacity-70 hover:opacity-100 border-red-500/10">Meu Timer para 10s</button>
+                        <button onClick={handleResetSession} className="w-full py-2 rounded-xl text-xs font-bold border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 transition-all text-red-400">
+                            Resetar Minha Sessão
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
