@@ -322,7 +322,7 @@ function TimeTab({ addLog, session, user, phase, setPhase, setUnlockAt }: any) {
             .single();
 
         if (error) {
-            addLog(`Erro ao criar sessão para ${selectedUser.display_name}: ${error.message}`);
+            addLog(`❌ Erro 403/RLS ao criar sessão para ${selectedUser.display_name}: ${error.message}. Execute o script fix_admin_sessions.sql no console do Supabase.`);
         } else {
             setTargetSession(data);
             addLog(`⚡ Sessão de TESTE criada para ${selectedUser.display_name} (1 hora)`);
