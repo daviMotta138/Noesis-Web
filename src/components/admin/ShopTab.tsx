@@ -15,6 +15,7 @@ interface ShopItem {
     rarity?: string;
     target_gender?: string;
     is_visible?: boolean;
+    is_free_default?: boolean;
 }
 
 export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
@@ -66,7 +67,8 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
             preview_url: item.preview_url || '',
             rarity: item.rarity || 'comum',
             target_gender: item.target_gender || 'all',
-            is_visible: item.is_visible !== false
+            is_visible: item.is_visible !== false,
+            is_free_default: item.is_free_default || false
         };
 
         if (editingItem && editingItem.id !== '') {
@@ -99,7 +101,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                 <button
                     onClick={() => {
                         setEditingItem({
-                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true
+                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true, is_free_default: false
                         });
                         setIsModalOpen(true);
                     }}
@@ -123,6 +125,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                                         <ImageIcon size={24} className="text-white/20" />
                                     )}
                                     <div className="absolute bottom-1 right-1 flex flex-col items-end gap-1">
+                                        {item.is_free_default && <div className="text-[8px] bg-green-500/80 px-1 rounded text-white uppercase">Padrão</div>}
                                         <div className="text-[9px] bg-black/80 px-1 rounded text-white/90 uppercase">{item.rarity || 'comum'}</div>
                                         <div className="text-[9px] bg-blue-500/80 px-1 rounded text-white uppercase">{item.target_gender || 'all'}</div>
                                         <div className="text-[10px] bg-black/80 px-1 rounded text-white/50 uppercase">{item.category}</div>
@@ -315,7 +318,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                         </div>
                     </div>
 
-                    <div>
+                    <div className="grid grid-cols-2 gap-4">
                         <label className="flex items-center gap-2 cursor-pointer group">
                             <input
                                 type="checkbox"
@@ -325,6 +328,17 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                             />
                             <span className="text-sm font-bold text-white/70 group-hover:text-white transition-colors">
                                 Mostrar item na Loja
+                            </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={draft.is_free_default || false}
+                                onChange={e => setDraft({ ...draft, is_free_default: e.target.checked })}
+                                className="w-4 h-4 rounded border-white/10 bg-black/50 text-gold focus:ring-gold"
+                            />
+                            <span className="text-sm font-bold text-white/70 group-hover:text-white transition-colors">
+                                Disponível por padrão
                             </span>
                         </label>
                     </div>
