@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react';
 
 export interface AvatarConfig {
     gender: 'man' | 'woman' | string;
+    base_image?: string;
+    base_gender?: string;
     pants: string;
     shirt: string;
     footwear: string;
@@ -43,8 +45,9 @@ interface Avatar2DProps {
  * Layer order (bottom → top): base → pants → shirt → footwear
  */
 function getLayers(cfg: AvatarConfig): string[] {
-    const isWoman = cfg.gender === 'woman';
-    const base = isWoman ? `/avatars/woman/girl.png` : `/avatars/man/boy.png`;
+    const isWoman = cfg.base_gender === 'woman' || cfg.gender === 'woman';
+    const defaultBase = isWoman ? `/avatars/woman/girl.png` : `/avatars/man/boy.png`;
+    const base = cfg.base_image || defaultBase;
     const layers = [base];
 
     // Helper to resolve layer path

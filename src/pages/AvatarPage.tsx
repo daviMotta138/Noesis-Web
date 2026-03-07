@@ -66,15 +66,16 @@ export default function AvatarPage() {
         });
     }, []);
 
+    const activeBaseGender = draft.base_gender || (draft.gender === 'woman' ? 'woman' : 'man');
+
     const getDynamicOptions = (cat: string) => {
         const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
-        const currentGender = draft.gender;
 
         return shopItems
             .filter(i => {
                 const isCat = i.category === cat;
                 const isUnlocked = unlocked.includes(i.id) || i.is_default;
-                const genderMatch = i.target_gender === 'all' || i.target_gender === currentGender;
+                const genderMatch = i.target_gender === 'all' || i.target_gender === activeBaseGender;
                 return isCat && isUnlocked && genderMatch;
             })
             .map(i => ({
@@ -93,6 +94,8 @@ export default function AvatarPage() {
                 id: i.id as any,
                 label: i.name,
                 image: i.preview_url || i.asset_key || '',
+                asset_key: i.asset_key || i.preview_url || '',
+                target_gender: i.target_gender || 'man',
                 available: true
             }));
     };
@@ -110,6 +113,49 @@ export default function AvatarPage() {
             setDraft((prev: any) => ({ ...prev, [key]: val } as any));
             setFlashKey(prev => prev + 1);
         }
+    };
+
+    const handleGenderChange = (g: any) => {
+        if (!g.available) return;
+
+        const isWoman = g.target_gender === 'woman' || g.id === 'woman' || g.label.toLowerCase().includes('menina');
+        const bGender = isWoman ? 'woman' : 'man';
+
+        const newConfig: any = {
+            ...draft,
+            gender: g.id,
+            base_image: g.asset_key || g.image,
+            base_gender: bGender
+        };
+
+        // Unequip incompatible items
+        ['shirt', 'pants', 'coat', 'footwear', 'headwear'].forEach(slot => {
+            const equippedId = newConfig[slot];
+            if (equippedId && equippedId !== 'none') {
+                const itemDef = shopItems.find(i => i.id === equippedId);
+                let isValid = true;
+
+                if (itemDef) {
+                    isValid = itemDef.target_gender === 'all' || itemDef.target_gender === bGender;
+                } else {
+                    const hardCodedList = slot === 'shirt' ? SHIRT_OPTIONS :
+                        slot === 'pants' ? PANTS_OPTIONS :
+                            slot === 'footwear' ? FOOTWEAR_OPTIONS :
+                                slot === 'headwear' ? HEADWEAR_OPTIONS : [];
+                    const hc = hardCodedList.find((o: any) => o.id === equippedId);
+                    if (hc && (hc as any).gender && (hc as any).gender !== bGender) {
+                        isValid = false;
+                    }
+                }
+
+                if (!isValid) {
+                    newConfig[slot] = 'none';
+                }
+            }
+        });
+
+        setDraft(newConfig);
+        setFlashKey(prev => prev + 1);
     };
 
     const handleSave = async () => {
@@ -310,10 +356,10 @@ export default function AvatarPage() {
 
                                 {activeTab === 'gender' && getCharacterOptions().map(g => (
                                     <ItemOption key={g.id} id={g.id} image={(g as any).image} emoji={(g as any).emoji} label={g.label} active={draft.gender === g.id}
-                                        disabled={!g.available} onClick={() => g.available && set('gender', g.id as any)} />
+                                        disabled={!g.available} onClick={() => handleGenderChange(g)} />
                                 ))}
 
-                                {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('shirt')].map(s => (
+                                {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shirt')].map(s => (
                                     <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={draft.shirt === s.id}
                                         onClick={() => set('shirt', s.id)} />
                                 ))}
@@ -323,17 +369,17 @@ export default function AvatarPage() {
                                         onClick={() => set('coat', c.id)} />
                                 ))}
 
-                                {activeTab === 'pants' && [...PANTS_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('pants')].map(p => (
+                                {activeTab === 'pants' && [...PANTS_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('pants')].map(p => (
                                     <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={draft.pants === p.id}
                                         onClick={() => set('pants', p.id)} />
                                 ))}
 
-                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('shoes')].map(f => (
+                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shoes')].map(f => (
                                     <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={draft.footwear === f.id}
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
-                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === draft.gender), ...getDynamicOptions('headwear')].map(h => {
+                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('headwear')].map(h => {
                                     // Base none option is always unlocked
                                     const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id) || shopItems.some(i => i.id === h.id && i.is_default);
                                     if (!isUnlocked) return null;

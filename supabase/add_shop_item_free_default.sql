@@ -11,7 +11,7 @@ SET is_default = true
 WHERE id IN ('man', 'woman') OR category = 'gender';
 
 -- Ensure Menina is created just in case she is missing, so the default works
-INSERT INTO public.shop_items (id, name, description, price_gold, price_nous, category, rarity, target_gender, is_visible, is_default, preview_url, asset_key)
+INSERT INTO public.shop_items (id, name, description, price_brl, price_nous, category, rarity, target_gender, is_visible, is_default, preview_url, asset_key)
 VALUES (
     'woman', 
     'Menina', 
@@ -29,7 +29,7 @@ VALUES (
 ON CONFLICT (id) DO UPDATE SET is_default = true;
 
 -- Ensure Menino is also in the shop_items so the frontend can pull it dynamically
-INSERT INTO public.shop_items (id, name, description, price_gold, price_nous, category, rarity, target_gender, is_visible, is_default, preview_url, asset_key)
+INSERT INTO public.shop_items (id, name, description, price_brl, price_nous, category, rarity, target_gender, is_visible, is_default, preview_url, asset_key)
 VALUES (
     'man', 
     'Menino', 
