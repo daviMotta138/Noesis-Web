@@ -48,7 +48,11 @@ export default function ShopPage() {
     useEffect(() => {
         const fetchShop = async () => {
             setLoadingShop(true);
-            const { data, error } = await supabase.from('shop_items').select('*').order('price_nous', { ascending: true });
+            const { data, error } = await supabase
+                .from('shop_items')
+                .select('*')
+                .eq('is_visible', true)
+                .order('price_nous', { ascending: true });
             if (error) {
                 console.error('Error fetching shop items:', error);
                 setLoadingShop(false);
@@ -95,6 +99,7 @@ export default function ShopPage() {
                 else if (item.category === 'effect') emoji = '✨';
                 else if (item.category === 'item') emoji = '🗡️';
                 else if (item.category === 'pet') emoji = '🦉';
+                else if (item.category === 'gender') emoji = '👤';
 
                 return {
                     id: item.id,
@@ -118,10 +123,12 @@ export default function ShopPage() {
             const accessories = mappedItems.filter(i => ['headwear', 'accessory', 'hair'].includes(i.category));
 
             const survival = mappedItems.filter(i => i.category === 'shield');
+            const characters = mappedItems.filter(i => i.category === 'gender');
             const mystics = mappedItems.filter(i => ['item', 'pet'].includes(i.category));
             const effects = mappedItems.filter(i => i.category === 'effect');
 
             setShopSections([
+                { title: 'Personagens', items: characters },
                 { title: 'Conjuntos Completos', items: outfits },
                 { title: 'Vestiário Superior', items: upperWear },
                 { title: 'Vestiário Inferior', items: lowerWear },

@@ -7,25 +7,25 @@ import { supabase } from '../lib/supabase';
 import { Avatar2D, DEFAULT_AVATAR_CONFIG, type AvatarConfig } from '../components/Avatar2D';
 
 const PANTS_OPTIONS = [
-    { id: 'calca-bege' as const, label: 'Bege', image: '/avatars/man/calca-bege.png' },
-    { id: 'calca-preta' as const, label: 'Preta', image: '/avatars/man/calca-preta.png' },
+    { id: 'calca-bege' as const, label: 'Bege', image: '/avatars/man/calca-bege.png', gender: 'man' },
+    { id: 'calca-preta' as const, label: 'Preta', image: '/avatars/man/calca-preta.png', gender: 'man' },
     { id: 'none' as const, label: 'Sem', isNone: true },
 ];
 
 const SHIRT_OPTIONS = [
-    { id: 'camisa-branca' as const, label: 'Branca', image: '/avatars/man/camisa-branca.png' },
-    { id: 'camisa-preta' as const, label: 'Preta', image: '/avatars/man/camisa-preta.png' },
+    { id: 'camisa-branca' as const, label: 'Branca', image: '/avatars/man/camisa-branca.png', gender: 'man' },
+    { id: 'camisa-preta' as const, label: 'Preta', image: '/avatars/man/camisa-preta.png', gender: 'man' },
     { id: 'none' as const, label: 'Sem', isNone: true },
 ];
 
 const FOOTWEAR_OPTIONS = [
-    { id: 'chinelo' as const, label: 'Chinelo', image: '/avatars/man/chinelo.png' },
-    { id: 'tenis' as const, label: 'Tênis', image: '/avatars/man/tenis.png' },
+    { id: 'chinelo' as const, label: 'Chinelo', image: '/avatars/man/chinelo.png', gender: 'man' },
+    { id: 'tenis' as const, label: 'Tênis', image: '/avatars/man/tenis.png', gender: 'man' },
     { id: 'none' as const, label: 'Nenhum', isNone: true },
 ];
 
 const HEADWEAR_OPTIONS = [
-    { id: 'bone-azul' as const, label: 'Boné Azul', image: '/avatars/man/bone-azul.png' },
+    { id: 'bone-azul' as const, label: 'Boné Azul', image: '/avatars/man/bone-azul.png', gender: 'man' },
     { id: 'none' as const, label: 'Sem Boné', isNone: true },
 ];
 
@@ -44,10 +44,7 @@ const OUTFITS_OPTIONS = [
     }
 ];
 
-const GENDER_OPTIONS = [
-    { id: 'man' as const, label: 'Menino', image: '/avatars/man/boy.png', available: true },
-    { id: 'woman' as const, label: 'Menina', emoji: '👧', available: false },
-];
+
 
 export default function AvatarPage() {
     const navigate = useNavigate();
@@ -73,13 +70,44 @@ export default function AvatarPage() {
 
     const getDynamicOptions = (cat: string) => {
         const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
+        const currentGender = draft.gender;
+
         return shopItems
-            .filter(i => i.category === cat && unlocked.includes(i.id))
+            .filter(i => {
+                const isCat = i.category === cat;
+                const isUnlocked = unlocked.includes(i.id);
+                const genderMatch = i.target_gender === 'all' || i.target_gender === currentGender;
+                return isCat && isUnlocked && genderMatch;
+            })
             .map(i => ({
                 id: i.asset_key || i.id,
                 label: i.name,
                 image: i.preview_url || i.asset_key || ''
             }));
+    };
+
+    const getCharacterOptions = () => {
+        const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
+        // Base man character is always available
+        const baseOptions = [
+            { id: 'man' as const, label: 'Menino', image: '/avatars/man/boy.png', available: true }
+        ];
+
+        const purchasedCharacters = shopItems
+            .filter(i => i.category === 'gender' && unlocked.includes(i.id))
+            .map(i => ({
+                id: i.id as any,
+                label: i.name,
+                image: i.preview_url || i.asset_key || '',
+                available: true
+            }));
+
+        // Merge and avoid duplicates
+        const all: any[] = [...baseOptions];
+        purchasedCharacters.forEach(pc => {
+            if (!all.find(a => a.id === pc.id)) all.push(pc);
+        });
+        return all;
     };
 
     const [flashKey, setFlashKey] = useState(0);
@@ -293,12 +321,12 @@ export default function AvatarPage() {
                                         }} />
                                 ))}
 
-                                {activeTab === 'gender' && GENDER_OPTIONS.map(g => (
+                                {activeTab === 'gender' && getCharacterOptions().map(g => (
                                     <ItemOption key={g.id} id={g.id} image={(g as any).image} emoji={(g as any).emoji} label={g.label} active={draft.gender === g.id}
-                                        disabled={!g.available} onClick={() => g.available && set('gender', 'man')} />
+                                        disabled={!g.available} onClick={() => g.available && set('gender', g.id as any)} />
                                 ))}
 
-                                {activeTab === 'shirt' && [...SHIRT_OPTIONS, ...getDynamicOptions('shirt')].map(s => (
+                                {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('shirt')].map(s => (
                                     <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={draft.shirt === s.id}
                                         onClick={() => set('shirt', s.id)} />
                                 ))}
@@ -308,17 +336,17 @@ export default function AvatarPage() {
                                         onClick={() => set('coat', c.id)} />
                                 ))}
 
-                                {activeTab === 'pants' && [...PANTS_OPTIONS, ...getDynamicOptions('pants')].map(p => (
+                                {activeTab === 'pants' && [...PANTS_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('pants')].map(p => (
                                     <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={draft.pants === p.id}
                                         onClick={() => set('pants', p.id)} />
                                 ))}
 
-                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS, ...getDynamicOptions('shoes')].map(f => (
+                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('shoes')].map(f => (
                                     <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={draft.footwear === f.id}
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
-                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS, ...getDynamicOptions('headwear')].map(h => {
+                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('headwear')].map(h => {
                                     // Base none option is always unlocked
                                     const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id) || shopItems.some(i => i.id === h.id);
                                     if (!isUnlocked) return null;

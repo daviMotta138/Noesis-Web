@@ -13,6 +13,8 @@ interface ShopItem {
     asset_key: string;
     preview_url: string | null;
     rarity?: string;
+    target_gender?: string;
+    is_visible?: boolean;
 }
 
 export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
@@ -62,7 +64,9 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
             price_brl: item.price_brl || null,
             asset_key: item.asset_key || '',
             preview_url: item.preview_url || '',
-            rarity: item.rarity || 'comum'
+            rarity: item.rarity || 'comum',
+            target_gender: item.target_gender || 'all',
+            is_visible: item.is_visible !== false
         };
 
         if (editingItem && editingItem.id !== '') {
@@ -95,7 +99,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                 <button
                     onClick={() => {
                         setEditingItem({
-                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum'
+                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true
                         });
                         setIsModalOpen(true);
                     }}
@@ -120,7 +124,9 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                                     )}
                                     <div className="absolute bottom-1 right-1 flex flex-col items-end gap-1">
                                         <div className="text-[9px] bg-black/80 px-1 rounded text-white/90 uppercase">{item.rarity || 'comum'}</div>
+                                        <div className="text-[9px] bg-blue-500/80 px-1 rounded text-white uppercase">{item.target_gender || 'all'}</div>
                                         <div className="text-[10px] bg-black/80 px-1 rounded text-white/50 uppercase">{item.category}</div>
+                                        {!item.is_visible && <div className="text-[8px] bg-red-500/80 px-1 rounded text-white uppercase">Oculto</div>}
                                     </div>
                                 </div>
                                 <div>
@@ -205,7 +211,9 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
             >
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold">{draft.id === '' ? 'Novo Item' : 'Editar Item'}</h2>
-                    <button onClick={onClose} className="p-2 text-white/50 hover:bg-white/5 rounded-full"><Edit2 size={16} className="opacity-0" /></button>
+                    <button onClick={onClose} className="p-2 text-white/50 hover:bg-white/5 rounded-full hover:bg-white/10">
+                        <Plus size={16} className="rotate-45" />
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto pr-2 space-y-4">
@@ -216,7 +224,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 type="text"
                                 value={draft.id || ''}
                                 onChange={e => setDraft({ ...draft, id: e.target.value })}
-                                disabled={item.id !== ''} // Cannot change ID after creation
+                                disabled={item.id !== ''}
                                 className="field bg-black/50"
                                 placeholder="ID do item"
                             />
@@ -273,8 +281,12 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 <option value="effect">Efeito de Partículas (Aura)</option>
                                 <option value="pet">Mascote</option>
                                 <option value="item">Item Místico (Ex: Espada)</option>
+                                <option value="gender">Personagem (Gênero)</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold w-full text-white/50 mb-1">Raridade</label>
                             <select
@@ -289,12 +301,37 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 <option value="lendario" className="text-yellow-400">Dourado (Lendário)</option>
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-xs font-bold w-full text-white/50 mb-1">Gênero Alvo</label>
+                            <select
+                                value={draft.target_gender || 'all'}
+                                onChange={e => setDraft({ ...draft, target_gender: e.target.value })}
+                                className="field bg-black/50"
+                            >
+                                <option value="all">Sem Gênero (Todos)</option>
+                                <option value="man">Masculino (Menino)</option>
+                                <option value="woman">Feminino (Menina)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={draft.is_visible !== false}
+                                onChange={e => setDraft({ ...draft, is_visible: e.target.checked })}
+                                className="w-4 h-4 rounded border-white/10 bg-black/50 text-gold focus:ring-gold"
+                            />
+                            <span className="text-sm font-bold text-white/70 group-hover:text-white transition-colors">
+                                Mostrar item na Loja
+                            </span>
+                        </label>
                     </div>
 
                     <hr className="border-white/5 my-4" />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Imagem da Loja */}
                         <div className="space-y-2">
                             <label className="block text-xs font-bold text-white/50">Imagem p/ Loja (Icone)</label>
                             <div className="flex items-center gap-4">
@@ -314,7 +351,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                     />
                                     <label
                                         htmlFor="upload-preview"
-                                        className="btn-ghost w-full flex items-center justify-center gap-2 py-2 text-xs"
+                                        className="btn-ghost w-full flex items-center justify-center gap-2 py-2 text-xs cursor-pointer"
                                     >
                                         {uploadingObj === 'preview' ? <Loader2 size={14} className="animate-spin" /> : 'FAZER UPLOAD'}
                                     </label>
@@ -329,12 +366,11 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                             </div>
                         </div>
 
-                        {/* Imagem do Ativo (Avatar) */}
                         <div className="space-y-2">
                             <label className="block text-xs font-bold text-white/50">Asset do Avatar (Imagem Usável)</label>
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-16 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-                                    {draft.asset_key && draft.asset_key.startsWith('http') ? (
+                                    {draft.asset_key && (draft.asset_key.startsWith('http') || draft.asset_key.startsWith('data:')) ? (
                                         <img src={draft.asset_key} alt="Asset" className="w-full h-full object-contain" />
                                     ) : <ImageIcon size={20} className="text-white/20" />}
                                 </div>
@@ -349,7 +385,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                     />
                                     <label
                                         htmlFor="upload-asset"
-                                        className="btn-ghost w-full flex items-center justify-center gap-2 py-2 text-xs"
+                                        className="btn-ghost w-full flex items-center justify-center gap-2 py-2 text-xs cursor-pointer"
                                     >
                                         {uploadingObj === 'asset' ? <Loader2 size={14} className="animate-spin" /> : 'FAZER UPLOAD'}
                                     </label>
@@ -363,7 +399,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 </div>
                             </div>
                             <p className="text-[10px] text-white/40 leading-tight">
-                                Para roupas, a imagem deve seguir o manequim padrão (transparent canvas bounds). Se for "escudo", pode deixar vazio.
+                                Para roupas, a imagem deve seguir o manequim padrão. No caso de 'Personagem', é a imagem base do corpo (transparent).
                             </p>
                         </div>
                     </div>
