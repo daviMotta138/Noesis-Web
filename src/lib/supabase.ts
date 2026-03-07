@@ -14,13 +14,9 @@ export const supabase = createClient(
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface AvatarConfig {
-    body: string;
-    hair: string;
-    shirt: string;
-    accessory: string;
-    shoes: string;
-}
+// AvatarConfig is defined in src/components/Avatar2D.tsx;
+// stored as JSONB in the DB so we type it loosely here.
+type AvatarConfigJson = Record<string, string>;
 
 export interface Profile {
     id: string;
@@ -34,7 +30,8 @@ export interface Profile {
     streak_shields: number;   // purchasable streak freezes
     is_admin: boolean;         // admin: unlimited Nous + timer control
     friend_id: string;
-    avatar_config: AvatarConfig;
+    avatar_config: AvatarConfigJson;
+    avatar_seen_announcement: boolean;
     word_count: number;
     created_at: string;
     league: string;

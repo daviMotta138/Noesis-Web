@@ -1,42 +1,56 @@
-import { useState, useRef, useEffect } from 'react';
-import { Copy, LogOut, Loader2, Edit2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Copy, LogOut, ChevronRight, Pencil, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { BadgeDisplay } from '../components/BadgeDisplay';
+import { Avatar2D, DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
 import type { AvatarConfig } from '../components/Avatar2D';
+import { AvatarEditor } from '../components/AvatarEditor';
+import { AvatarAnnouncement } from '../components/AvatarAnnouncement';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
-
-const AVATAR_OPTIONS = {
-    body: [{ id: 'body_01', label: 'Claro' }, { id: 'body_02', label: 'Médio' }, { id: 'body_03', label: 'Escuro' }],
-    hair: [{ id: 'none', label: 'Nenhum' }, { id: 'hair_short', label: 'Curto' }, { id: 'hair_long', label: 'Longo' }, { id: 'hair_curly', label: 'Cacheado' }],
-    shirt: [{ id: 'shirt_blue', label: 'Azul' }, { id: 'shirt_red', label: 'Vermelho' }, { id: 'shirt_purple', label: 'Roxo' }, { id: 'shirt_white', label: 'Branco' }],
-    accessory: [{ id: 'none', label: 'Nenhum' }, { id: 'glasses_round', label: 'Óculos R.' }, { id: 'glasses_classic', label: 'Óculos C.' }, { id: 'crown_gold', label: 'Coroa' }],
-    shoes: [{ id: 'shoes_white', label: 'Branco' }, { id: 'shoes_black', label: 'Preto' }, { id: 'shoes_sneaker', label: 'Tênis' }],
-};
-
-const SECTION_LABELS: Record<string, string> = {
-    body: 'Tom de pele', hair: 'Cabelo', shirt: 'Camisa', accessory: 'Acessório', shoes: 'Calçado',
-};
-
-const DEFAULT_AVATAR: AvatarConfig = {
-    body: 'body_01', hair: 'hair_short', shirt: 'shirt_blue', accessory: 'none', shoes: 'shoes_white',
-};
 
 export default function ProfilePage() {
     const { profile, user, updateProfile, setUser, setProfile, fetchProfile } = useGameStore();
     const [friendsCount, setFriendsCount] = useState(0);
     const [copied, setCopied] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [uploadError, setUploadError] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [editorOpen, setEditorOpen] = useState(false);
+    const [fullBodyOpen, setFullBodyOpen] = useState(false);
+    const [announcementOpen, setAnnouncementOpen] = useState(false);
 
-    const avatarConfig: AvatarConfig = { ...DEFAULT_AVATAR, ...(profile?.avatar_config ?? {}) };
-    const avatarUrl = (profile as any)?.avatar_url as string | null;
+    // Derived avatar config from profile
+    const avatarConfig: AvatarConfig = {
+        ...DEFAULT_AVATAR_CONFIG,
+        ...(profile?.avatar_config ?? {}),
+    };
 
-    const handleAvatarChange = (key: keyof AvatarConfig, value: string) => {
-        const newConfig = { ...avatarConfig, [key]: value };
-        updateProfile({ avatar_config: newConfig });
+    // Show announcement once per user if they haven't seen it yet
+    useEffect(() => {
+        if (profile && !(profile as any).avatar_seen_announcement) {
+            // Slight delay so the page loads first
+            const t = setTimeout(() => setAnnouncementOpen(true), 600);
+            return () => clearTimeout(t);
+        }
+    }, [profile]);
+
+    const handleDismissAnnouncement = async () => {
+        setAnnouncementOpen(false);
+        if (user?.id) {
+            await supabase.from('profiles').update({ avatar_seen_announcement: true }).eq('id', user.id);
+            if (user?.id) fetchProfile(user.id);
+        }
+    };
+
+    const handleCustomizeFromAnnouncement = () => {
+        setAnnouncementOpen(false);
+        handleDismissAnnouncement();
+        setEditorOpen(true);
+    };
+
+    const handleSaveAvatar = async (cfg: AvatarConfig) => {
+        await updateProfile({ avatar_config: cfg as any });
     };
 
     const handleLogout = async () => {
@@ -51,101 +65,74 @@ export default function ProfilePage() {
         }
     };
 
-
-    // Fetch accepted friends count
-
     useEffect(() => {
         if (!user) return;
         const fetchFriendsCount = async () => {
-            const { count, error } = await supabase
+            const { count } = await supabase
                 .from('friendships')
                 .select('*', { count: 'exact', head: true })
                 .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
                 .eq('status', 'accepted');
-            if (error) console.error("Error fetching friends count:", error);
             setFriendsCount(count || 0);
         };
         fetchFriendsCount();
     }, [user]);
 
-    // ── Photo upload ──────────────────────────────────────────────────────────
-    const handlePhotoClick = () => fileInputRef.current?.click();
-
-    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !user?.id) return;
-
-        // Validate
-        if (file.size > 2 * 1024 * 1024) { setUploadError('Arquivo muito grande (máx. 2MB)'); return; }
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            setUploadError('Use JPG, PNG ou WebP'); return;
-        }
-
-        setUploading(true); setUploadError(null);
-        try {
-            const ext = file.name.split('.').pop();
-            const path = `${user.id}/avatar.${ext}`;
-
-            const { error: upErr } = await supabase.storage
-                .from('avatars')
-                .upload(path, file, { upsert: true, contentType: file.type });
-
-            if (upErr) throw upErr;
-
-            const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(path);
-
-            // Add cache-busting timestamp
-            const url = `${publicUrl}?t=${Date.now()}`;
-
-            await supabase.from('profiles')
-                .update({ avatar_url: url })
-                .eq('id', user.id);
-
-            await fetchProfile(user.id);
-        } catch (err: any) {
-            setUploadError(err?.message ?? 'Erro ao fazer upload. Verifique o bucket "avatars" no Supabase Storage.');
-        } finally {
-            setUploading(false);
-            // Reset input so same file can be re-selected
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
-
-    // Placeholder for accuracy, assuming it's calculated elsewhere or will be added
-    const accuracy = 85; // Example value
+    const accuracy = 85;
 
     return (
-        <div className="min-h-screen pb-24 text-white font-body relative">
-            {/* Transparent Top Section (Avatar & Basic Info) */}
-            <div className="px-5 pt-12 relative z-10 flex flex-col items-center">
-                <div className="relative mb-6">
-                    <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[var(--color-border-glow)] shadow-2xl">
-                        {profile?.avatar_url ? (
-                            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-[var(--color-surface)] flex items-center justify-center text-5xl">
-                                🧠
-                            </div>
-                        )}
+        <div className="min-h-screen pb-24 text-white font-body">
+
+            {/* ── Avatar bust section ── */}
+            <div className="px-5 pt-10 flex flex-col items-center">
+                <div className="relative mb-4">
+
+                    {/* Bust avatar frame */}
+                    <div className="relative"
+                        style={{
+                            background: 'linear-gradient(to bottom, rgba(168,85,247,0.1), rgba(0,0,0,0))',
+                            borderRadius: '50% 50% 0 0',
+                            padding: '16px 24px 0',
+                        }}>
+                        <Avatar2D config={avatarConfig} mode="bust" width={140} />
+
+                        {/* Purple glow beneath */}
+                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-24 h-6 rounded-full blur-xl opacity-50"
+                            style={{ background: '#A855F7' }} />
                     </div>
-                    <button onClick={handlePhotoClick} disabled={uploading}
-                        className="absolute bottom-1 right-1 w-8 h-8 rounded-full flex items-center justify-center bg-[var(--color-primary)] hover:brightness-110 transition-colors shadow-lg" title="Alterar Foto">
-                        {uploading ? <Loader2 size={16} className="animate-spin text-white" /> : <Edit2 size={16} className="text-white" />}
+
+                    {/* Edit pencil button */}
+                    <button
+                        onClick={() => setEditorOpen(true)}
+                        className="absolute top-0 right-0 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95"
+                        style={{
+                            background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
+                            boxShadow: '0 2px 12px rgba(168,85,247,0.5)',
+                        }}>
+                        <Pencil size={15} className="text-white" />
                     </button>
-                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-                        className="hidden" onChange={handlePhotoChange} />
                 </div>
 
-                {uploadError && <p className="text-xs text-[var(--color-danger)] mb-2 text-center">{uploadError}</p>}
+                {/* "Ver completo" button */}
+                <button
+                    onClick={() => setFullBodyOpen(true)}
+                    className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-4 rounded-full mb-4 transition-all active:scale-95"
+                    style={{
+                        color: '#C084FC',
+                        background: 'rgba(168,85,247,0.1)',
+                        border: '1px solid rgba(168,85,247,0.25)',
+                    }}>
+                    Ver completo
+                    <ChevronRight size={12} />
+                </button>
 
+                {/* Name */}
                 <h1 className="text-3xl font-black text-center tracking-tight mb-6">
                     {profile?.display_name || 'Estudante'}
                 </h1>
 
-                {/* ── Core Markers (Nous, Streak, Friends, Shields) ── */}
-                <div className="w-full grid grid-cols-4 gap-2 mb-8 max-w-sm">
+                {/* Stats grid */}
+                <div className="w-full grid grid-cols-4 gap-2 mb-6 max-w-sm">
                     <div className="flex flex-col items-center justify-center bg-[var(--color-glass)] rounded-2xl py-3 border border-[var(--color-border)]">
                         <img src={coinImg} className="w-5 h-5 mb-1 object-contain" alt="" />
                         <span className="text-sm font-black">{profile?.nous_coins || 0}</span>
@@ -170,54 +157,22 @@ export default function ProfilePage() {
             </div>
 
             {/* Friend ID and Logout */}
-            <div className="px-5 mt-4 flex justify-between items-center relative z-10">
+            <div className="px-5 flex justify-between items-center mb-6">
                 <p className="text-sm font-medium text-[var(--color-text-muted)] flex items-center gap-2">
                     ID: {profile?.friend_id ?? '---'}
                     <button onClick={copyFriendId} title="Copiar ID">
                         <Copy size={13} style={{ color: copied ? 'var(--color-success)' : 'inherit' }} />
                     </button>
                 </p>
-                <button onClick={handleLogout} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors" title="Sair">
+                <button onClick={handleLogout}
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors"
+                    title="Sair">
                     <LogOut size={18} className="text-white" />
                 </button>
             </div>
 
-            {/* Avatar customizer — only shown if no photo */}
-            {!avatarUrl && (
-                <div className="px-5 mb-6 mt-4">
-                    <p className="text-xs uppercase font-bold text-[var(--color-text-muted)] mb-3 tracking-wider">
-                        Personalizar Avatar
-                    </p>
-                    <div className="rounded-2xl p-4 space-y-4" style={{ background: 'var(--color-surface)', border: '2px solid var(--color-border)' }}>
-                        {(Object.keys(AVATAR_OPTIONS) as (keyof typeof AVATAR_OPTIONS)[]).map(key => (
-                            <div key={key}>
-                                <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-[var(--color-text-sub)]">
-                                    {SECTION_LABELS[key]}
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {AVATAR_OPTIONS[key].map(({ id, label }) => {
-                                        const active = avatarConfig[key as keyof AvatarConfig] === id;
-                                        return (
-                                            <button key={id} onClick={() => handleAvatarChange(key as keyof AvatarConfig, id)}
-                                                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border-2"
-                                                style={{
-                                                    background: active ? 'rgba(28, 176, 246, 0.1)' : 'transparent',
-                                                    color: active ? 'var(--color-primary)' : 'var(--color-text-sub)',
-                                                    borderColor: active ? 'var(--color-primary)' : 'var(--color-border)',
-                                                }}>
-                                                {label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* ── Compact Stats Row ── */}
-            <div className="px-5 mt-2 relative z-10 w-full">
+            {/* Stats row */}
+            <div className="px-5 mb-6">
                 <p className="text-xs uppercase font-bold text-[var(--color-text-muted)] tracking-widest pl-2 mb-3">Resumo</p>
                 <div className="flex gap-3 w-full">
                     <div className="flex-1 bg-[var(--color-glass)] border border-[var(--color-border)] rounded-2xl p-4 flex flex-col justify-between">
@@ -244,56 +199,76 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            {/* Badges / Broches (Phase 6.3) */}
-            <div className="px-5 mt-8 mb-6">
+            {/* Badges */}
+            <div className="px-5 mb-6">
                 <div className="flex justify-between items-end mb-4 border-b-2 pb-2" style={{ borderColor: 'var(--color-border)' }}>
                     <h2 className="text-xl font-bold text-[var(--color-text)]">Broches de Conquista</h2>
                 </div>
-                
-                {/* Badge Display Component */}
                 {user?.id && (
-                    <BadgeDisplay 
-                        userId={user.id}
-                        showTitle={false}
-                        maxDisplay={12}
-                        variant="grid"
-                    />
+                    <BadgeDisplay userId={user.id} showTitle={false} maxDisplay={12} variant="grid" />
                 )}
             </div>
 
-            {/* Avatar customizer — only shown if no photo */}
-            {!avatarUrl && (
-                <div className="px-5 mb-6 mt-4">
-                    <p className="text-xs uppercase font-bold text-[var(--color-text-muted)] mb-3 tracking-wider pl-2">
-                        Personalizar Avatar
-                    </p>
-                    <div className="rounded-3xl p-5 space-y-5 bg-[var(--color-glass)] border border-[var(--color-border)]">
-                        {(Object.keys(AVATAR_OPTIONS) as (keyof typeof AVATAR_OPTIONS)[]).map(key => (
-                            <div key={key}>
-                                <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-[var(--color-text-sub)]">
-                                    {SECTION_LABELS[key]}
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    {AVATAR_OPTIONS[key].map(({ id, label }) => {
-                                        const active = avatarConfig[key as keyof AvatarConfig] === id;
-                                        return (
-                                            <button key={id} onClick={() => handleAvatarChange(key as keyof AvatarConfig, id)}
-                                                className="px-4 py-2 rounded-2xl text-xs font-bold transition-all border-2"
-                                                style={{
-                                                    background: active ? 'rgba(28, 176, 246, 0.15)' : 'transparent',
-                                                    color: active ? 'var(--color-primary)' : 'var(--color-text-sub)',
-                                                    borderColor: active ? 'var(--color-primary)' : 'var(--color-border)',
-                                                }}>
-                                                {label}
-                                            </button>
-                                        );
-                                    })}
+            {/* ── Avatar Editor bottom sheet ── */}
+            <AvatarEditor
+                open={editorOpen}
+                current={avatarConfig}
+                onSave={handleSaveAvatar}
+                onClose={() => setEditorOpen(false)}
+            />
+
+            {/* ── Full-body avatar modal ── */}
+            {createPortal(
+                <AnimatePresence>
+                    {fullBodyOpen && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[200] flex items-center justify-center px-6"
+                            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(14px)' }}
+                            onClick={() => setFullBodyOpen(false)}>
+                            <motion.div
+                                initial={{ scale: 0.85, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.85, opacity: 0 }}
+                                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                                className="relative flex flex-col items-center"
+                                onClick={e => e.stopPropagation()}>
+                                {/* Close button */}
+                                <button
+                                    onClick={() => setFullBodyOpen(false)}
+                                    className="absolute -top-4 -right-4 w-9 h-9 rounded-full flex items-center justify-center z-10"
+                                    style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
+                                    <X size={16} style={{ color: 'var(--color-text-muted)' }} />
+                                </button>
+
+                                {/* Full avatar */}
+                                <div className="relative">
+                                    <Avatar2D config={avatarConfig} mode="full" width={200} />
+                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 h-8 rounded-full blur-xl opacity-40"
+                                        style={{ background: '#A855F7' }} />
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+
+                                <p className="mt-6 text-base font-black text-white">
+                                    {profile?.display_name || 'Estudante'}
+                                </p>
+                                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                                    Toque fora para fechar
+                                </p>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
             )}
+
+            {/* ── New feature announcement (one-time) ── */}
+            <AvatarAnnouncement
+                open={announcementOpen}
+                onCustomize={handleCustomizeFromAnnouncement}
+                onDismiss={handleDismissAnnouncement}
+            />
         </div>
     );
 }
