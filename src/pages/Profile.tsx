@@ -4,19 +4,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
+import { useNavigate } from 'react-router-dom';
 import { BadgeDisplay } from '../components/BadgeDisplay';
 import { Avatar2D, DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
 import type { AvatarConfig } from '../components/Avatar2D';
-import { AvatarEditor } from '../components/AvatarEditor';
 import { AvatarAnnouncement } from '../components/AvatarAnnouncement';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
 export default function ProfilePage() {
-    const { profile, user, updateProfile, setUser, setProfile, fetchProfile } = useGameStore();
+    const { profile, user, setUser, setProfile, fetchProfile } = useGameStore();
+    const navigate = useNavigate();
     const [friendsCount, setFriendsCount] = useState(0);
     const [copied, setCopied] = useState(false);
-    const [editorOpen, setEditorOpen] = useState(false);
     const [fullBodyOpen, setFullBodyOpen] = useState(false);
     const [announcementOpen, setAnnouncementOpen] = useState(false);
 
@@ -46,11 +46,7 @@ export default function ProfilePage() {
     const handleCustomizeFromAnnouncement = () => {
         setAnnouncementOpen(false);
         handleDismissAnnouncement();
-        setEditorOpen(true);
-    };
-
-    const handleSaveAvatar = async (cfg: AvatarConfig) => {
-        await updateProfile({ avatar_config: cfg as any });
+        navigate('/avatar');
     };
 
     const handleLogout = async () => {
@@ -103,7 +99,7 @@ export default function ProfilePage() {
 
                     {/* Edit pencil button */}
                     <button
-                        onClick={() => setEditorOpen(true)}
+                        onClick={() => navigate('/avatar')}
                         className="absolute top-0 right-0 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95"
                         style={{
                             background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
@@ -208,14 +204,6 @@ export default function ProfilePage() {
                     <BadgeDisplay userId={user.id} showTitle={false} maxDisplay={12} variant="grid" />
                 )}
             </div>
-
-            {/* ── Avatar Editor bottom sheet ── */}
-            <AvatarEditor
-                open={editorOpen}
-                current={avatarConfig}
-                onSave={handleSaveAvatar}
-                onClose={() => setEditorOpen(false)}
-            />
 
             {/* ── Full-body avatar modal ── */}
             {createPortal(

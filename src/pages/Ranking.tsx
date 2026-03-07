@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { PromotionModal } from '../components/PromotionModal';
 import { DemotionModal } from '../components/DemotionModal';
+import { ProfileRing } from '../components/ProfileRing';
 
 function getNextSunday20h() {
     const now = new Date();
@@ -25,6 +26,7 @@ interface RankEntry {
     id: string;
     display_name: string;
     avatar_url: string | null;
+    avatar_config?: Record<string, string>;
     friend_id: string;
     streak: number;
     score: number;
@@ -127,7 +129,7 @@ export default function RankingPage() {
         try {
             const { data: leagueData } = await supabase
                 .from('profiles')
-                .select('id, display_name, avatar_url, friend_id, streak, score, league')
+                .select('id, display_name, avatar_url, avatar_config, friend_id, streak, score, league')
                 .eq('league', tab)
                 .order('score', { ascending: false })
                 .limit(50);
@@ -224,12 +226,11 @@ export default function RankingPage() {
                                 style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)' }}
                             >
                                 <div className="flex items-start gap-4 mb-5">
-                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl overflow-hidden flex-shrink-0"
-                                        style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                                        {selectedPlayer.avatar_url
-                                            ? <img src={selectedPlayer.avatar_url} alt="" className="w-full h-full object-cover" />
-                                            : getAvatar(selectedPlayer.display_name)}
-                                    </div>
+                                    <ProfileRing
+                                        photoUrl={selectedPlayer.avatar_url}
+                                        avatarConfig={selectedPlayer.avatar_config}
+                                        size={64}
+                                    />
                                     <div className="flex-1 min-w-0">
                                         <h2 className="text-xl font-black text-gradient-gold truncate">{selectedPlayer.display_name}</h2>
                                         <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{selectedPlayer.league} · #{selectedPlayer.friend_id}</p>

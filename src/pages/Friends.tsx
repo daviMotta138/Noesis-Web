@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Send, Search, Check, X, Users, MessageCircle, ChevronLeft, Gift } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
+import { ProfileRing } from '../components/ProfileRing';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
@@ -18,6 +19,7 @@ interface FriendProfile {
     status: 'accepted' | 'pending_sent' | 'pending_received';
     friendshipId: string;
     badges?: string[];
+    avatar_config?: Record<string, string>;
 }
 
 interface Message {
@@ -227,14 +229,11 @@ function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile;
             <div className="flex-1 overflow-y-auto px-6 py-8">
                 {/* Avatar placeholder */}
                 <div className="flex justify-center mb-6">
-                    <div className="w-28 h-28 rounded-3xl flex items-center justify-center text-6xl shadow-xl overflow-hidden"
-                        style={{ background: 'var(--color-card)', border: '2px solid var(--color-border-glow)' }}>
-                        {friend.avatar_url ? (
-                            <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                            friend.display_name.charAt(0).toUpperCase()
-                        )}
-                    </div>
+                    <ProfileRing
+                        photoUrl={friend.avatar_url}
+                        avatarConfig={friend.avatar_config}
+                        size={112}
+                    />
                 </div>
 
                 <h2 className="text-2xl font-black text-display text-center text-gradient-gold mb-1">

@@ -18,6 +18,7 @@ import SettingsPage from './pages/Settings';
 import Layout from './components/Layout';
 import PlaygroundPage from './pages/Playground';
 import BattleRoyalePage from './pages/BattleRoyale';
+import AvatarPage from './pages/AvatarPage';
 import { ChangelogModal } from './components/ChangelogModal';
 import HorizontalCanvas, { CANVAS_ROUTES } from './components/HorizontalCanvas';
 import { MusicPlayer } from './components/MusicPlayer';
@@ -76,6 +77,7 @@ function AnimatedRoutes() {
           <Route path="/settings" element={<Fade><SettingsPage /></Fade>} />
           <Route path="/playground" element={<Fade><PlaygroundPage /></Fade>} />
           <Route path="/battle-royale" element={<Fade><BattleRoyalePage /></Fade>} />
+          <Route path="/avatar" element={<Fade><AvatarPage /></Fade>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
