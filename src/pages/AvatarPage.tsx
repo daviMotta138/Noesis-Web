@@ -66,6 +66,35 @@ export default function AvatarPage() {
         });
     }, []);
 
+    // One-time sweep to auto-unequip conflicting items when shop items load or change
+    useEffect(() => {
+        if (shopItems.length === 0) return;
+
+        const newDraft = { ...draft };
+        const eqIds = [newDraft.shirt, newDraft.coat, newDraft.pants, newDraft.footwear, newDraft.headwear].filter(i => i && i !== 'none');
+
+        const disabledCats: string[] = [];
+        eqIds.forEach(eqId => {
+            const def = shopItems.find(i => i.id === eqId);
+            if (def && def.disabled_categories) {
+                disabledCats.push(...def.disabled_categories);
+            }
+        });
+
+        let needsUpdate = false;
+        if (disabledCats.includes('shirt') && newDraft.shirt !== 'none') { newDraft.shirt = 'none'; needsUpdate = true; }
+        if (disabledCats.includes('coat') && newDraft.coat !== 'none') { newDraft.coat = 'none'; needsUpdate = true; }
+        if (disabledCats.includes('pants') && newDraft.pants !== 'none') { newDraft.pants = 'none'; needsUpdate = true; }
+        if ((disabledCats.includes('shoes') || disabledCats.includes('footwear')) && newDraft.footwear !== 'none') { newDraft.footwear = 'none'; needsUpdate = true; }
+        if (disabledCats.includes('headwear') && newDraft.headwear !== 'none') { newDraft.headwear = 'none'; needsUpdate = true; }
+
+        if (needsUpdate) {
+            setDraft(newDraft);
+            setFlashKey(prev => prev + 1);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shopItems]); // Intentionally not including draft to prevent looping, we only want to sanitize against loaded definitions once
+
     const activeBaseGender = draft.base_gender || (draft.gender === 'woman' ? 'woman' : 'man');
 
     const getDynamicOptions = (cat: string) => {
@@ -381,21 +410,25 @@ export default function AvatarPage() {
 
                                 {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shirt')].map(s => (
                                     <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={draft.shirt === s.id}
+                                        disabled={disabledCategories.includes('shirt') && s.id !== 'none'} disabledReason="Bloqueado"
                                         onClick={() => set('shirt', s.id)} />
                                 ))}
 
                                 {activeTab === 'coat' && [{ id: 'none', label: 'Sem Casaco', isNone: true }, ...getDynamicOptions('coat')].map(c => (
                                     <ItemOption key={c.id} id={c.id} image={(c as any).image} isNone={(c as any).isNone} label={c.label} active={draft.coat === c.id || (!draft.coat && c.id === 'none')}
+                                        disabled={disabledCategories.includes('coat') && c.id !== 'none'} disabledReason="Bloqueado"
                                         onClick={() => set('coat', c.id)} />
                                 ))}
 
                                 {activeTab === 'pants' && [...PANTS_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('pants')].map(p => (
                                     <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={draft.pants === p.id}
+                                        disabled={disabledCategories.includes('pants') && p.id !== 'none'} disabledReason="Bloqueado"
                                         onClick={() => set('pants', p.id)} />
                                 ))}
 
                                 {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shoes')].map(f => (
                                     <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={draft.footwear === f.id}
+                                        disabled={(disabledCategories.includes('shoes') || disabledCategories.includes('footwear')) && f.id !== 'none'} disabledReason="Bloqueado"
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
