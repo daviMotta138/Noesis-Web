@@ -68,17 +68,13 @@ export default function AvatarPage() {
 
     const getDynamicOptions = (cat: string) => {
         const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
-        const currentGenderId = draft.gender;
-
-        // Determine the target_gender of the currently selected character
-        const currentChar = shopItems.find(i => i.id === currentGenderId);
-        const currentBodyType = currentChar?.target_gender || 'man';
+        const currentGender = draft.gender;
 
         return shopItems
             .filter(i => {
                 const isCat = i.category === cat;
-                const isUnlocked = unlocked.includes(i.id) || i.is_free_default;
-                const genderMatch = i.target_gender === 'all' || i.target_gender === currentBodyType;
+                const isUnlocked = unlocked.includes(i.id) || i.is_default;
+                const genderMatch = i.target_gender === 'all' || i.target_gender === currentGender;
                 return isCat && isUnlocked && genderMatch;
             })
             .map(i => ({
@@ -92,12 +88,11 @@ export default function AvatarPage() {
         const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
 
         return shopItems
-            .filter(i => i.category === 'gender' && (unlocked.includes(i.id) || i.is_free_default))
+            .filter(i => i.category === 'gender' && (unlocked.includes(i.id) || i.is_default))
             .map(i => ({
-                id: i.id,
+                id: i.id as any,
                 label: i.name,
                 image: i.preview_url || i.asset_key || '',
-                body_type: i.target_gender,
                 available: true
             }));
     };
@@ -192,20 +187,10 @@ export default function AvatarPage() {
             {/* ── Left/Top Area: Avatar Display ── */}
             <div className="flex-1 relative flex items-center justify-center pt-8 pb-32 md:pt-0 md:pb-0 overflow-hidden pointer-events-none">
                 <motion.div layoutId="hero-avatar" className="h-[90%] md:h-[80%] max-h-[800px] w-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
-                    {(() => {
-                        const currentChar = shopItems.find(i => i.id === draft.gender);
-                        const resolvedConfig = {
-                            ...draft,
-                            gender: currentChar?.asset_key || draft.gender,
-                            body_type: (currentChar?.target_gender as any) || draft.body_type || (draft.gender === 'woman' ? 'woman' : 'man')
-                        };
-                        return (
-                            <Avatar2D config={resolvedConfig} mode="full" className="w-auto transform-gpu relative z-10" style={{
-                                height: `233%`,
-                                transform: `translateY(0vh)`
-                            }} />
-                        );
-                    })()}
+                    <Avatar2D config={draft} mode="full" className="w-auto transform-gpu relative z-10" style={{
+                        height: `233%`,
+                        transform: `translateY(0vh)`
+                    }} />
 
                     {/* Blue Firefly Particle Transition */}
                     <AnimatePresence mode="wait">
@@ -324,8 +309,8 @@ export default function AvatarPage() {
                                 ))}
 
                                 {activeTab === 'gender' && getCharacterOptions().map(g => (
-                                    <ItemOption key={g.id} id={g.id} image={g.image} label={g.label} active={draft.gender === g.id}
-                                        onClick={() => setDraft(prev => ({ ...prev, gender: g.id, body_type: g.body_type as any }))} />
+                                    <ItemOption key={g.id} id={g.id} image={(g as any).image} emoji={(g as any).emoji} label={g.label} active={draft.gender === g.id}
+                                        disabled={!g.available} onClick={() => g.available && set('gender', g.id as any)} />
                                 ))}
 
                                 {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('shirt')].map(s => (
@@ -348,9 +333,9 @@ export default function AvatarPage() {
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
-                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter(o => !o.gender || o.gender === draft.gender), ...getDynamicOptions('headwear')].map(h => {
+                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === draft.gender), ...getDynamicOptions('headwear')].map(h => {
                                     // Base none option is always unlocked
-                                    const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id) || shopItems.some(i => i.id === h.id);
+                                    const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id) || shopItems.some(i => i.id === h.id && i.is_default);
                                     if (!isUnlocked) return null;
                                     return (
                                         <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={draft.headwear === h.id}

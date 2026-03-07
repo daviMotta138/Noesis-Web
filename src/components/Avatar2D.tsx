@@ -2,8 +2,7 @@
 import type { CSSProperties } from 'react';
 
 export interface AvatarConfig {
-    gender: string; // This can be an ID (man/woman) or an image path/URL
-    body_type?: 'man' | 'woman';
+    gender: 'man' | 'woman' | string;
     pants: string;
     shirt: string;
     footwear: string;
@@ -14,7 +13,6 @@ export interface AvatarConfig {
 
 export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
     gender: 'man',
-    body_type: 'man',
     pants: 'calca-bege',
     shirt: 'camisa-branca',
     footwear: 'chinelo',
@@ -40,25 +38,24 @@ interface Avatar2DProps {
 
 // Natural PNG dimensions (boy.png is portrait, layers share same canvas)
 
+/**
+ * Returns the src path for each layer based on config.
+ * Layer order (bottom → top): base → pants → shirt → footwear
+ */
 function getLayers(cfg: AvatarConfig): string[] {
-    const isWoman = cfg.gender === 'woman' || cfg.body_type === 'woman';
-    let base = isWoman ? `/avatars/woman/girl.png` : `/avatars/man/boy.png`;
-
-    // If gender looks like a path or URL, use it as the base image
-    if (cfg.gender && (cfg.gender.startsWith('http') || cfg.gender.startsWith('/') || cfg.gender.includes('.'))) {
-        base = cfg.gender;
-    }
-
+    const isWoman = cfg.gender === 'woman';
+    const base = isWoman ? `/avatars/woman/girl.png` : `/avatars/man/boy.png`;
     const layers = [base];
-    const genderFolder = isWoman ? 'woman' : 'man';
 
     // Helper to resolve layer path
     const resolvePath = (val: string | undefined, validList: string[], def: string) => {
         if (!val || val === 'none') return null;
         if (val.startsWith('http') || val.startsWith('/')) return val; // Dynamic image
         const safe = validList.includes(val) ? val : def;
-        return safe !== 'none' ? `/avatars/${genderFolder}/${safe}.png` : null;
+        return safe !== 'none' ? `/avatars/man/${safe}.png` : null;
     };
+
+    const genderFolder = isWoman ? 'woman' : 'man';
 
     // "chinelo" footwear goes UNDER pants
     const footerPath = cfg.footwear;
