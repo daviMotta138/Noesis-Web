@@ -128,30 +128,9 @@ export default function AvatarPage() {
             base_gender: bGender
         };
 
-        // Unequip incompatible items
+        // Unequip items forcefully on character switch as requested by user
         ['shirt', 'pants', 'coat', 'footwear', 'headwear'].forEach(slot => {
-            const equippedId = newConfig[slot];
-            if (equippedId && equippedId !== 'none') {
-                const itemDef = shopItems.find(i => i.id === equippedId);
-                let isValid = true;
-
-                if (itemDef) {
-                    isValid = itemDef.target_gender === 'all' || itemDef.target_gender === bGender;
-                } else {
-                    const hardCodedList = slot === 'shirt' ? SHIRT_OPTIONS :
-                        slot === 'pants' ? PANTS_OPTIONS :
-                            slot === 'footwear' ? FOOTWEAR_OPTIONS :
-                                slot === 'headwear' ? HEADWEAR_OPTIONS : [];
-                    const hc = hardCodedList.find((o: any) => o.id === equippedId);
-                    if (hc && (hc as any).gender && (hc as any).gender !== bGender) {
-                        isValid = false;
-                    }
-                }
-
-                if (!isValid) {
-                    newConfig[slot] = 'none';
-                }
-            }
+            newConfig[slot] = 'none';
         });
 
         setDraft(newConfig);
