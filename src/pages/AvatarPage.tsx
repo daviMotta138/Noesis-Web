@@ -24,7 +24,6 @@ const FOOTWEAR_OPTIONS = [
 ];
 
 const HEADWEAR_OPTIONS = [
-    { id: 'bone-azul' as const, label: 'Boné Azul', image: '/avatars/man/bone-azul.png', gender: 'man' },
     { id: 'none' as const, label: 'Sem Boné', isNone: true },
 ];
 
