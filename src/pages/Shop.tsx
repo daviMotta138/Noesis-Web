@@ -20,6 +20,7 @@ interface ShopItem {
     comingSoon?: boolean;
     amount?: number;
     image?: string;
+    rarity?: string;
 }
 
 // We will dynamically fetch this from Supabase now.
@@ -57,30 +58,44 @@ export default function ShopPage() {
             // Map generic database items into the UI interface
             const mappedItems: ShopItem[] = data.map((item: any) => {
                 let amount = 1;
+                // Fallbacks if not set
                 let bgStyle = 'linear-gradient(180deg, #FFFFFF80, #CCCCCC20)';
                 let borderStyle = '#FFFFFF';
                 let emoji = '📦';
 
-                // Attempt to infer emoji & styles from type or ID heuristically
+                // Rarities colors (Fortnite Style)
+                const rarityColors: Record<string, { bg: string, border: string }> = {
+                    comum: { border: '#A0AEC0', bg: 'linear-gradient(180deg, #4A556880, #2D374820)' }, // Gray
+                    incomum: { border: '#48BB78', bg: 'linear-gradient(180deg, #38A16980, #27674920)' }, // Green
+                    raro: { border: '#4299E1', bg: 'linear-gradient(180deg, #3182CE80, #2B6CB020)' }, // Blue
+                    epico: { border: '#9F7AEA', bg: 'linear-gradient(180deg, #805AD580, #553C9A20)' }, // Purple
+                    lendario: { border: '#ECC94B', bg: 'linear-gradient(180deg, #D69E2E80, #975A1620)' }, // Gold
+                };
+
+                const r = item.rarity || 'comum';
+                if (rarityColors[r]) {
+                    bgStyle = rarityColors[r].bg;
+                    borderStyle = rarityColors[r].border;
+                }
+
+                // Emojis based on category
                 if (item.category === 'shield') {
                     emoji = '🛡️';
-                    bgStyle = 'linear-gradient(180deg, #A0522D80, #8B451320)';
-                    borderStyle = '#FFD700';
                     if (item.id === 'shield_3') amount = 3;
                     if (item.id === 'shield_5') amount = 5;
                     if (item.id === 'shield_10') amount = 10;
-                } else if (item.category === 'headwear') { emoji = '🧢'; borderStyle = '#3B82F6'; bgStyle = 'linear-gradient(180deg, #1E40AF80, #1E3A8A20)'; }
-                else if (item.category === 'hair') { emoji = '💇'; borderStyle = '#D2691E'; bgStyle = 'linear-gradient(180deg, #D2691E80, #8B451320)'; }
-                else if (item.category === 'shirt') { emoji = '👕'; borderStyle = '#8A2BE2'; bgStyle = 'linear-gradient(180deg, #8A2BE280, #4B008220)'; }
-                else if (item.category === 'pants') { emoji = '👖'; borderStyle = '#4682B4'; bgStyle = 'linear-gradient(180deg, #4682B480, #00008020)'; }
-                else if (item.category === 'coat') { emoji = '🧥'; borderStyle = '#B22222'; bgStyle = 'linear-gradient(180deg, #B2222280, #80000020)'; }
-                else if (item.category === 'shoes') { emoji = '👟'; borderStyle = '#FFFFFF'; bgStyle = 'linear-gradient(180deg, #FFFFFF80, #CCCCCC20)'; }
-                else if (item.category === 'accessory') { emoji = '🕶️'; borderStyle = '#333333'; bgStyle = 'linear-gradient(180deg, #00000080, #11111120)'; }
-                else if (item.category === 'effect') { emoji = '✨'; borderStyle = '#FF4500'; bgStyle = 'linear-gradient(180deg, #FF450080, #8B000020)'; }
-                else if (item.category === 'item') { emoji = '🗡️'; borderStyle = '#4682B4'; bgStyle = 'linear-gradient(180deg, #4682B480, #00008020)'; }
-                else if (item.category === 'pet') { emoji = '🦉'; borderStyle = '#CD853F'; bgStyle = 'linear-gradient(180deg, #A0522D80, #8B451320)'; }
+                } else if (item.category === 'headwear') emoji = '🧢';
+                else if (item.category === 'hair') emoji = '💇';
+                else if (item.category === 'shirt') emoji = '👕';
+                else if (item.category === 'outfits') emoji = '🛍️';
+                else if (item.category === 'coat') emoji = '🧥';
+                else if (item.category === 'pants') emoji = '👖';
+                else if (item.category === 'shoes') emoji = '👟';
+                else if (item.category === 'accessory') emoji = '🕶️';
+                else if (item.category === 'effect') emoji = '✨';
+                else if (item.category === 'item') emoji = '🗡️';
+                else if (item.category === 'pet') emoji = '🦉';
 
-                // The preview_url from DB overrides generic emoji if present later
                 return {
                     id: item.id,
                     name: item.name,
@@ -91,19 +106,29 @@ export default function ShopPage() {
                     bgStyle,
                     borderStyle,
                     amount,
-                    image: item.preview_url || undefined
+                    image: item.preview_url || undefined,
+                    rarity: r
                 };
             });
 
-            // Group them
+            // Group them into explicit user-requested categories
+            const upperWear = mappedItems.filter(i => ['shirt', 'coat'].includes(i.category));
+            const lowerWear = mappedItems.filter(i => ['pants', 'shoes'].includes(i.category));
+            const outfits = mappedItems.filter(i => i.category === 'outfits');
+            const accessories = mappedItems.filter(i => ['headwear', 'accessory', 'hair'].includes(i.category));
+
             const survival = mappedItems.filter(i => i.category === 'shield');
-            const cosmetics = mappedItems.filter(i => ['headwear', 'hair', 'shirt', 'pants', 'coat', 'shoes', 'accessory', 'effect'].includes(i.category));
             const mystics = mappedItems.filter(i => ['item', 'pet'].includes(i.category));
+            const effects = mappedItems.filter(i => i.category === 'effect');
 
             setShopSections([
-                { title: 'Sobrevivência & Vantagens', items: survival },
-                { title: 'Cosméticos Avatar', items: cosmetics },
-                { title: 'Itens Místicos', items: mystics },
+                { title: 'Conjuntos Completos', items: outfits },
+                { title: 'Vestiário Superior', items: upperWear },
+                { title: 'Vestiário Inferior', items: lowerWear },
+                { title: 'Acessórios & Cabelo', items: accessories },
+                { title: 'Vantagens (Sobrevivência)', items: survival },
+                { title: 'Misticismo', items: mystics },
+                { title: 'Efeitos Especiais', items: effects }
             ].filter(sec => sec.items.length > 0));
 
             setLoadingShop(false);

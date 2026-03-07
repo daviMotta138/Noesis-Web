@@ -12,6 +12,7 @@ interface ShopItem {
     price_brl: number | null;
     asset_key: string;
     preview_url: string | null;
+    rarity?: string;
 }
 
 export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
@@ -60,7 +61,8 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
             price_nous: item.price_nous || 0,
             price_brl: item.price_brl || null,
             asset_key: item.asset_key || '',
-            preview_url: item.preview_url || ''
+            preview_url: item.preview_url || '',
+            rarity: item.rarity || 'comum'
         };
 
         if (editingItem && editingItem.id !== '') {
@@ -93,7 +95,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                 <button
                     onClick={() => {
                         setEditingItem({
-                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: ''
+                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum'
                         });
                         setIsModalOpen(true);
                     }}
@@ -116,8 +118,9 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                                     ) : (
                                         <ImageIcon size={24} className="text-white/20" />
                                     )}
-                                    <div className="absolute bottom-1 right-1 text-[10px] bg-black/80 px-1 rounded text-white/70 uppercase">
-                                        {item.category}
+                                    <div className="absolute bottom-1 right-1 flex flex-col items-end gap-1">
+                                        <div className="text-[9px] bg-black/80 px-1 rounded text-white/90 uppercase">{item.rarity || 'comum'}</div>
+                                        <div className="text-[10px] bg-black/80 px-1 rounded text-white/50 uppercase">{item.category}</div>
                                     </div>
                                 </div>
                                 <div>
@@ -258,16 +261,32 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 onChange={e => setDraft({ ...draft, category: e.target.value })}
                                 className="field bg-black/50"
                             >
-                                <option value="shield">Escudo (Sobrevivência)</option>
+                                <option value="shield">Vantagens (Sobrevivência/Escudo)</option>
+                                <option value="outfits">Conjuntos (Equipa tudo)</option>
+                                <option value="shirt">Vestuário Superior (Camisa)</option>
+                                <option value="coat">Casacos (Jaqueta/Por cima)</option>
+                                <option value="pants">Vestuário Inferior (Calça)</option>
+                                <option value="shoes">Calçado (Tênis/Chinelo)</option>
                                 <option value="hair">Cabelo</option>
-                                <option value="shirt">Parte Superior (Camisa)</option>
-                                <option value="pants">Parte Inferior (Calça)</option>
-                                <option value="shoes">Calçado</option>
                                 <option value="headwear">Acessório de Cabeça (Boné/Chapéu)</option>
                                 <option value="accessory">Acessório de Rosto</option>
                                 <option value="effect">Efeito de Partículas (Aura)</option>
                                 <option value="pet">Mascote</option>
-                                <option value="item">Item de Segurar</option>
+                                <option value="item">Item Místico (Ex: Espada)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold w-full text-white/50 mb-1">Raridade</label>
+                            <select
+                                value={draft.rarity || 'comum'}
+                                onChange={e => setDraft({ ...draft, rarity: e.target.value })}
+                                className="field bg-black/50 font-bold"
+                            >
+                                <option value="comum" className="text-gray-400">Cinza (Comum)</option>
+                                <option value="incomum" className="text-green-400">Verde (Incomum)</option>
+                                <option value="raro" className="text-blue-400">Azul (Raro)</option>
+                                <option value="epico" className="text-purple-400">Roxo (Épico)</option>
+                                <option value="lendario" className="text-yellow-400">Dourado (Lendário)</option>
                             </select>
                         </div>
                     </div>
