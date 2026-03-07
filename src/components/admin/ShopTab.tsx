@@ -1,0 +1,362 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { Loader2, Plus, Edit2, Trash2, Image as ImageIcon, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface ShopItem {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    price_nous: number;
+    price_brl: number | null;
+    asset_key: string;
+    preview_url: string | null;
+}
+
+export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
+    const [items, setItems] = useState<ShopItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editingItem, setEditingItem] = useState<ShopItem | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    useEffect(() => {
+        fetchItems();
+    }, []);
+
+    const fetchItems = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.from('shop_items').select('*').order('created_at', { ascending: false });
+        if (error) {
+            addLog(`Erro ao carregar itens da loja: ${error.message}`);
+        } else {
+            setItems(data || []);
+        }
+        setLoading(false);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Excluir este item da loja permanentemente? Os usuários que já o possuem não o perderão, mas ele sumirá da loja.')) return;
+        const { error } = await supabase.from('shop_items').delete().eq('id', id);
+        if (error) {
+            addLog(`Erro ao excluir item: ${error.message}`);
+        } else {
+            addLog(`Item ${id} excluído com sucesso.`);
+            fetchItems();
+        }
+    };
+
+    const handleSave = async (item: Partial<ShopItem>) => {
+        if (!item.id || !item.name || !item.category) {
+            alert('Campos ID, Nome e Categoria são obrigatórios.');
+            return;
+        }
+
+        const payload = {
+            id: item.id,
+            name: item.name,
+            description: item.description || '',
+            category: item.category,
+            price_nous: item.price_nous || 0,
+            price_brl: item.price_brl || null,
+            asset_key: item.asset_key || '',
+            preview_url: item.preview_url || ''
+        };
+
+        if (editingItem && editingItem.id !== '') {
+            // Update
+            const { error } = await supabase.from('shop_items').update(payload).eq('id', editingItem.id);
+            if (error) {
+                addLog(`Erro ao atualizar item: ${error.message}`);
+            } else {
+                addLog(`Item ${item.name} atualizado.`);
+                setIsModalOpen(false);
+                fetchItems();
+            }
+        } else {
+            // Insert
+            const { error } = await supabase.from('shop_items').insert(payload);
+            if (error) {
+                addLog(`Erro ao criar item: ${error.message}`);
+            } else {
+                addLog(`Item ${item.name} criado.`);
+                setIsModalOpen(false);
+                fetchItems();
+            }
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-black text-white">Gerenciar Loja</h3>
+                <button
+                    onClick={() => {
+                        setEditingItem({
+                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: ''
+                        });
+                        setIsModalOpen(true);
+                    }}
+                    className="btn-gold py-2 px-4 flex items-center gap-2 text-sm"
+                >
+                    <Plus size={16} /> NOVO ITEM
+                </button>
+            </div>
+
+            {loading ? (
+                <div className="flexjustify-center py-10"><Loader2 className="animate-spin text-white/50 w-8 h-8 mx-auto" /></div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {items.map(item => (
+                        <div key={item.id} className="panel p-4 flex flex-col justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                                <div className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden relative">
+                                    {item.preview_url ? (
+                                        <img src={item.preview_url} alt={item.name} className="w-full h-full object-contain" />
+                                    ) : (
+                                        <ImageIcon size={24} className="text-white/20" />
+                                    )}
+                                    <div className="absolute bottom-1 right-1 text-[10px] bg-black/80 px-1 rounded text-white/70 uppercase">
+                                        {item.category}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-lg leading-tight">{item.name}</h4>
+                                    <p className="text-xs text-white/50 mt-1">{item.description}</p>
+                                    <p className="text-xs font-mono text-gold mt-2">{item.price_nous} Nous</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/5">
+                                <button
+                                    onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                                    className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors"
+                                    title="Editar"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(item.id)}
+                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition-colors"
+                                    title="Excluir"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Modal */}
+            <AnimatePresence>
+                {isModalOpen && editingItem && (
+                    <ItemModal
+                        item={editingItem}
+                        onClose={() => setIsModalOpen(false)}
+                        onSave={handleSave}
+                        addLog={addLog}
+                    />
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose: () => void, onSave: (i: Partial<ShopItem>) => void, addLog: (m: string) => void }) {
+    const [draft, setDraft] = useState<Partial<ShopItem>>({ ...item });
+    const [uploadingObj, setUploadingObj] = useState<'preview' | 'asset' | null>(null);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'preview_url' | 'asset_key') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingObj(field === 'preview_url' ? 'preview' : 'asset');
+        try {
+            const ext = file.name.split('.').pop() || 'png';
+            const fileName = `shop_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+
+            const { data, error } = await supabase.storage.from('shop_assets').upload(fileName, file, { upsert: false });
+            if (error) throw error;
+
+            const { data: publicData } = supabase.storage.from('shop_assets').getPublicUrl(data.path);
+
+            setDraft(prev => ({ ...prev, [field]: publicData.publicUrl }));
+            addLog(`Imagem enviada: ${fileName}`);
+        } catch (err: any) {
+            addLog(`Erro no upload: ${err.message}`);
+            alert(`Falha no upload: ${err.message}`);
+        } finally {
+            setUploadingObj(null);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="panel w-full max-w-2xl bg-deep/90 border-white/10 p-6 relative z-10 flex flex-col max-h-[90vh]"
+            >
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold">{draft.id === '' ? 'Novo Item' : 'Editar Item'}</h2>
+                    <button onClick={onClose} className="p-2 text-white/50 hover:bg-white/5 rounded-full"><Edit2 size={16} className="opacity-0" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-white/50 mb-1">ID Único (ex: bone_vermelho)</label>
+                            <input
+                                type="text"
+                                value={draft.id || ''}
+                                onChange={e => setDraft({ ...draft, id: e.target.value })}
+                                disabled={item.id !== ''} // Cannot change ID after creation
+                                className="field bg-black/50"
+                                placeholder="ID do item"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-white/50 mb-1">Nome no App</label>
+                            <input
+                                type="text"
+                                value={draft.name || ''}
+                                onChange={e => setDraft({ ...draft, name: e.target.value })}
+                                className="field bg-black/50"
+                                placeholder="Ex: Boné de Fogo"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-white/50 mb-1">Descrição</label>
+                        <input
+                            type="text"
+                            value={draft.description || ''}
+                            onChange={e => setDraft({ ...draft, description: e.target.value })}
+                            className="field bg-black/50"
+                            placeholder="Descrição curta"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-white/50 mb-1">Preço em Nous</label>
+                            <input
+                                type="number"
+                                value={draft.price_nous || 0}
+                                onChange={e => setDraft({ ...draft, price_nous: parseInt(e.target.value) || 0 })}
+                                className="field bg-black/50"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-white/50 mb-1">Categoria</label>
+                            <select
+                                value={draft.category || 'shirt'}
+                                onChange={e => setDraft({ ...draft, category: e.target.value })}
+                                className="field bg-black/50"
+                            >
+                                <option value="shield">Escudo (Sobrevivência)</option>
+                                <option value="hair">Cabelo</option>
+                                <option value="shirt">Parte Superior (Camisa)</option>
+                                <option value="pants">Parte Inferior (Calça)</option>
+                                <option value="shoes">Calçado</option>
+                                <option value="headwear">Acessório de Cabeça (Boné/Chapéu)</option>
+                                <option value="accessory">Acessório de Rosto</option>
+                                <option value="effect">Efeito de Partículas (Aura)</option>
+                                <option value="pet">Mascote</option>
+                                <option value="item">Item de Segurar</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr className="border-white/5 my-4" />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Imagem da Loja */}
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-white/50">Imagem p/ Loja (Icone)</label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                                    {draft.preview_url ? (
+                                        <img src={draft.preview_url} alt="Preview" className="w-full h-full object-contain" />
+                                    ) : <ImageIcon size={20} className="text-white/20" />}
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={e => handleUpload(e, 'preview_url')}
+                                        className="hidden"
+                                        id="upload-preview"
+                                        disabled={uploadingObj === 'preview'}
+                                    />
+                                    <label
+                                        htmlFor="upload-preview"
+                                        className="btn-ghost w-full flex items-center justify-center gap-2 py-2 text-xs"
+                                    >
+                                        {uploadingObj === 'preview' ? <Loader2 size={14} className="animate-spin" /> : 'FAZER UPLOAD'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={draft.preview_url || ''}
+                                        onChange={e => setDraft({ ...draft, preview_url: e.target.value })}
+                                        className="field bg-black/50 text-[10px] mt-2 py-1.5"
+                                        placeholder="Ou cole a URL direta..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Imagem do Ativo (Avatar) */}
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-white/50">Asset do Avatar (Imagem Usável)</label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 bg-black/50 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                                    {draft.asset_key && draft.asset_key.startsWith('http') ? (
+                                        <img src={draft.asset_key} alt="Asset" className="w-full h-full object-contain" />
+                                    ) : <ImageIcon size={20} className="text-white/20" />}
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={e => handleUpload(e, 'asset_key')}
+                                        className="hidden"
+                                        id="upload-asset"
+                                        disabled={uploadingObj === 'asset'}
+                                    />
+                                    <label
+                                        htmlFor="upload-asset"
+                                        className="btn-ghost w-full flex items-center justify-center gap-2 py-2 text-xs"
+                                    >
+                                        {uploadingObj === 'asset' ? <Loader2 size={14} className="animate-spin" /> : 'FAZER UPLOAD'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={draft.asset_key || ''}
+                                        onChange={e => setDraft({ ...draft, asset_key: e.target.value })}
+                                        className="field bg-black/50 text-[10px] mt-2 py-1.5"
+                                        placeholder="Ou cole a URL direta..."
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-[10px] text-white/40 leading-tight">
+                                Para roupas, a imagem deve seguir o manequim padrão (transparent canvas bounds). Se for "escudo", pode deixar vazio.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+                    <button onClick={onClose} className="btn-ghost">Cancelar</button>
+                    <button onClick={() => onSave(draft)} className="btn-gold flex items-center gap-2">
+                        <Check size={18} /> SALVAR ITEM
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+}

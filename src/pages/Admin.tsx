@@ -5,14 +5,15 @@ import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Users, Clock, Image as ImageIcon,
     Search, Trash2, Upload, Shield, Coins, Loader2, User, Music, Bell, Send,
-    RefreshCw, AlertTriangle
+    RefreshCw, AlertTriangle, Store
 } from 'lucide-react';
 // test utilities
 import { LeaguePromotionTester } from '../components/LeaguePromotionTester';
+import { ShopTab } from '../components/admin/ShopTab';
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
 
-type Tab = 'overview' | 'users' | 'time' | 'banners' | 'radio' | 'push' | 'promo';
+type Tab = 'overview' | 'users' | 'time' | 'banners' | 'radio' | 'push' | 'promo' | 'shop';
 
 export default function AdminPage() {
     const navigate = useNavigate();
@@ -46,6 +47,7 @@ export default function AdminPage() {
                     <TabButton active={activeTab === 'banners'} onClick={() => setActiveTab('banners')} icon={ImageIcon} label="Atualizações" />
                     <TabButton active={activeTab === 'radio'} onClick={() => setActiveTab('radio')} icon={Music} label="Rádio" />
                     <TabButton active={activeTab === 'push'} onClick={() => setActiveTab('push')} icon={Bell} label="Push Notif" />
+                    <TabButton active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} icon={Store} label="Loja" />
                     <TabButton active={activeTab === 'promo'} onClick={() => setActiveTab('promo')} icon={LayoutDashboard} label="Promoções" />
                     <TabButton active={activeTab === 'time'} onClick={() => setActiveTab('time')} icon={Clock} label="Testes/Tempo" />
                 </nav>
@@ -61,6 +63,7 @@ export default function AdminPage() {
                             {activeTab === 'banners' && <BannersTab addLog={addLog} />}
                             {activeTab === 'radio' && <RadioTab addLog={addLog} />}
                             {activeTab === 'push' && <PushTab addLog={addLog} />}
+                            {activeTab === 'shop' && <ShopTab addLog={addLog} />}
                             {activeTab === 'time' && <TimeTab addLog={addLog} session={session} user={user} phase={phase} setPhase={setPhase} setUnlockAt={setUnlockAt} loadActiveSession={loadActiveSession} fetchProfile={fetchProfile} />}
                             {activeTab === 'promo' && <LeaguePromotionTester />}
                         </motion.div>
