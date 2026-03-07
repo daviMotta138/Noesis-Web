@@ -20,7 +20,6 @@ const SHIRT_OPTIONS = [
 
 const FOOTWEAR_OPTIONS = [
     { id: 'chinelo' as const, label: 'Chinelo', image: '/avatars/man/chinelo.png', gender: 'man' },
-    { id: 'tenis' as const, label: 'Tênis', image: '/avatars/man/tenis.png', gender: 'man' },
     { id: 'none' as const, label: 'Nenhum', isNone: true },
 ];
 
@@ -88,9 +87,10 @@ export default function AvatarPage() {
 
     const getCharacterOptions = () => {
         const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
-        // Base man character is always available
+        // Base man and woman characters are now available by default
         const baseOptions = [
-            { id: 'man' as const, label: 'Menino', image: '/avatars/man/boy.png', available: true }
+            { id: 'man' as const, label: 'Menino', image: '/avatars/man/boy.png', available: true },
+            { id: 'woman' as const, label: 'Menina', image: '/avatars/woman/girl.png', available: true }
         ];
 
         const purchasedCharacters = shopItems

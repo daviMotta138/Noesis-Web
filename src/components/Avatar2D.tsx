@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'react';
 
 export interface AvatarConfig {
-    gender: 'man';
+    gender: 'man' | 'woman' | string;
     pants: string;
     shirt: string;
     footwear: string;
@@ -22,7 +22,6 @@ export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
 
 const VALID_PANTS = ['calca-bege', 'calca-preta', 'none'];
 const VALID_SHIRTS = ['camisa-branca', 'camisa-preta', 'none'];
-const VALID_FOOTWEAR = ['chinelo', 'tenis', 'none'];
 const VALID_HEADWEAR = ['bone-azul', 'none'];
 
 interface Avatar2DProps {
@@ -44,21 +43,24 @@ interface Avatar2DProps {
  * Layer order (bottom → top): base → pants → shirt → footwear
  */
 function getLayers(cfg: AvatarConfig): string[] {
-    const base = `/avatars/man/boy.png`;
+    const isWoman = cfg.gender === 'woman';
+    const base = isWoman ? `/avatars/woman/girl.png` : `/avatars/man/boy.png`;
     const layers = [base];
 
     // Helper to resolve layer path
     const resolvePath = (val: string | undefined, validList: string[], def: string) => {
         if (!val || val === 'none') return null;
-        if (val.startsWith('http')) return val; // Dynamic image from Admin DB
+        if (val.startsWith('http') || val.startsWith('/')) return val; // Dynamic image
         const safe = validList.includes(val) ? val : def;
         return safe !== 'none' ? `/avatars/man/${safe}.png` : null;
     };
 
+    const genderFolder = isWoman ? 'woman' : 'man';
+
     // "chinelo" footwear goes UNDER pants
-    const footerPath = cfg.footwear?.startsWith('http') ? cfg.footwear : (VALID_FOOTWEAR.includes(cfg.footwear) ? cfg.footwear : DEFAULT_AVATAR_CONFIG.footwear);
+    const footerPath = cfg.footwear;
     if (footerPath === 'chinelo' || footerPath?.includes('chinelo')) {
-        layers.push(footerPath.startsWith('http') ? footerPath : `/avatars/man/chinelo.png`);
+        layers.push(footerPath.startsWith('http') || footerPath.startsWith('/') ? footerPath : `/avatars/${genderFolder}/chinelo.png`);
     }
 
     // Pants layer
@@ -71,12 +73,12 @@ function getLayers(cfg: AvatarConfig): string[] {
 
     // Coat layer (Casacos) goes over shirt
     if (cfg.coat && cfg.coat !== 'none') {
-        layers.push(cfg.coat.startsWith('http') ? cfg.coat : `/avatars/man/${cfg.coat}.png`);
+        layers.push((cfg.coat.startsWith('http') || cfg.coat.startsWith('/')) ? cfg.coat : `/avatars/${genderFolder}/${cfg.coat}.png`);
     }
 
     // "tenis" and other footwear goes OVER pants and shirts/coats
     if (footerPath && footerPath !== 'none' && footerPath !== 'chinelo' && !footerPath.includes('chinelo')) {
-        layers.push(footerPath.startsWith('http') ? footerPath : `/avatars/man/${footerPath}.png`);
+        layers.push((footerPath.startsWith('http') || footerPath.startsWith('/')) ? footerPath : `/avatars/${genderFolder}/${footerPath}.png`);
     }
 
     // Headwear
