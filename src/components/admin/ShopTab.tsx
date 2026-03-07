@@ -16,6 +16,7 @@ interface ShopItem {
     target_gender?: string;
     is_visible?: boolean;
     is_default?: boolean;
+    disabled_categories?: string[];
 }
 
 export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
@@ -68,7 +69,8 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
             rarity: item.rarity || 'comum',
             target_gender: item.target_gender || 'all',
             is_visible: item.is_visible !== false,
-            is_default: item.is_default === true
+            is_default: item.is_default === true,
+            disabled_categories: item.disabled_categories || []
         };
 
         if (editingItem && editingItem.id !== '') {
@@ -101,7 +103,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                 <button
                     onClick={() => {
                         setEditingItem({
-                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true, is_default: false
+                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true, is_default: false, disabled_categories: []
                         });
                         setIsModalOpen(true);
                     }}
@@ -343,6 +345,45 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 </span>
                             </div>
                         </label>
+                    </div>
+
+                    <div className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-3">
+                        <div>
+                            <label className="block text-xs font-bold text-white/50 mb-1">Desativar Categorias ao Equipar</label>
+                            <p className="text-[10px] text-white/40 leading-tight">
+                                Selecione as categorias que serão impedidas de serem usadas junto com este item (ex: se for um Peitoral grande, selecione "Casacos").
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                            {[
+                                { id: 'shirt', label: 'Camisa' },
+                                { id: 'coat', label: 'Casacos' },
+                                { id: 'pants', label: 'Calças' },
+                                { id: 'shoes', label: 'Calçados' },
+                                { id: 'headwear', label: 'A. Cabeça' },
+                                { id: 'accessory', label: 'A. Rosto' },
+                                { id: 'hair', label: 'Cabelo' },
+                            ].map(cat => (
+                                <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={(draft.disabled_categories || []).includes(cat.id)}
+                                        onChange={(e) => {
+                                            const cats = draft.disabled_categories || [];
+                                            if (e.target.checked) {
+                                                setDraft({ ...draft, disabled_categories: [...cats, cat.id] });
+                                            } else {
+                                                setDraft({ ...draft, disabled_categories: cats.filter(c => c !== cat.id) });
+                                            }
+                                        }}
+                                        className="w-3.5 h-3.5 rounded border-white/10 bg-black/50 text-gold focus:ring-gold"
+                                    />
+                                    <span className="text-[11px] font-bold text-white/70 group-hover:text-white transition-colors">
+                                        {cat.label}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
                     </div>
 
                     <hr className="border-white/5 my-4" />

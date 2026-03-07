@@ -108,9 +108,38 @@ export default function AvatarPage() {
         }
     };
 
+    const equippedItemIds = [draft.shirt, draft.coat, draft.pants, draft.footwear, draft.headwear].filter(i => i && i !== 'none');
+
+    // Calculate which categories are disabled by the currently equipped items
+    const disabledCategories = equippedItemIds.reduce((acc, eqId) => {
+        const itemDef = shopItems.find(i => i.id === eqId);
+        if (itemDef && itemDef.disabled_categories) {
+            itemDef.disabled_categories.forEach((cat: string) => {
+                if (!acc.includes(cat)) acc.push(cat);
+            });
+        }
+        return acc;
+    }, [] as string[]);
+
     const set = <K extends keyof AvatarConfig>(key: K, val: AvatarConfig[K]) => {
         if (draft[key] !== val) {
-            setDraft((prev: any) => ({ ...prev, [key]: val } as any));
+            const newDraft = { ...draft, [key]: val };
+
+            // Auto unequip items in newly disabled categories
+            if (val !== 'none') {
+                const itemDef = shopItems.find(i => i.id === val);
+                if (itemDef && itemDef.disabled_categories) {
+                    itemDef.disabled_categories.forEach((cat: string) => {
+                        if (['shirt', 'coat', 'pants', 'shoes', 'footwear', 'headwear'].includes(cat)) {
+                            // map "shoes" back to "footwear" state property if needed, though state is footwear
+                            const stateKey = cat === 'shoes' ? 'footwear' : cat;
+                            (newDraft as any)[stateKey] = 'none';
+                        }
+                    });
+                }
+            }
+
+            setDraft(newDraft as any);
             setFlashKey(prev => prev + 1);
         }
     };
@@ -150,7 +179,7 @@ export default function AvatarPage() {
     };
 
     // Sub-components for options to keep render clean
-    const ItemOption = ({ image, emoji, isNone, active, onClick, label, disabled = false }: any) => (
+    const ItemOption = ({ image, emoji, isNone, active, onClick, label, disabled = false, disabledReason }: any) => (
         <button
             onClick={onClick}
             disabled={disabled}
@@ -178,7 +207,9 @@ export default function AvatarPage() {
             {disabled && (
                 <div className="absolute inset-0 rounded-2xl bg-black/40 flex flex-col items-center justify-center gap-1 backdrop-blur-[1px]">
                     <AlertCircle size={14} className="text-yellow-400" />
-                    <span className="text-[9px] uppercase tracking-wider font-black text-white/90">Em breve</span>
+                    <span className="text-[9px] uppercase tracking-wider font-black text-white/90 text-center px-2">
+                        {disabledReason || 'Em breve'}
+                    </span>
                 </div>
             )}
         </button>
@@ -278,26 +309,36 @@ export default function AvatarPage() {
                             {[
                                 { id: 'outfits', label: 'Conjuntos', emoji: '🛍️' },
                                 { id: 'gender', label: 'Personagem', emoji: '👦' },
-                                { id: 'hair', label: 'Cabelo', emoji: '💇' },
-                                { id: 'shirt', label: 'Superior', emoji: '👕' },
-                                { id: 'coat', label: 'Casacos', emoji: '🧥' },
-                                { id: 'pants', label: 'Inferior', emoji: '👖' },
-                                { id: 'footwear', label: 'Calçados', emoji: '👟' },
-                                { id: 'headwear', label: 'Acessórios', emoji: '🧢' },
-                            ].map(t => (
-                                <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-                                    className="flex flex-col items-center justify-center p-3 rounded-2xl min-w-[80px] transition-all bg-white/5 whitespace-nowrap"
-                                    style={{
-                                        border: `1px solid ${activeTab === t.id ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)'}`,
-                                        background: activeTab === t.id ? 'rgba(168,85,247,0.1)' : 'var(--color-glass)',
-                                    }}>
-                                    <span className="text-xl mb-1">{t.emoji}</span>
-                                    <span className="text-[10px] uppercase tracking-wider font-bold"
-                                        style={{ color: activeTab === t.id ? 'var(--color-primary-light)' : 'var(--color-text-muted)' }}>
-                                        {t.label}
-                                    </span>
-                                </button>
-                            ))}
+                                { id: 'hair', label: 'Cabelo', emoji: '💇', disabledKey: 'hair' },
+                                { id: 'shirt', label: 'Superior', emoji: '👕', disabledKey: 'shirt' },
+                                { id: 'coat', label: 'Casacos', emoji: '🧥', disabledKey: 'coat' },
+                                { id: 'pants', label: 'Inferior', emoji: '👖', disabledKey: 'pants' },
+                                { id: 'footwear', label: 'Calçados', emoji: '👟', disabledKey: 'shoes' },
+                                { id: 'headwear', label: 'Acessórios', emoji: '🧢', disabledKey: 'headwear' },
+                            ].map(t => {
+                                const isTabDisabled = t.disabledKey ? disabledCategories.includes(t.disabledKey) : false;
+                                return (
+                                    <button key={t.id} onClick={() => !isTabDisabled && setActiveTab(t.id as any)}
+                                        className="flex flex-col items-center justify-center p-3 rounded-2xl min-w-[80px] transition-all bg-white/5 whitespace-nowrap relative overflow-hidden"
+                                        style={{
+                                            border: `1px solid ${activeTab === t.id ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)'}`,
+                                            background: activeTab === t.id ? 'rgba(168,85,247,0.1)' : 'var(--color-glass)',
+                                            opacity: isTabDisabled ? 0.5 : 1,
+                                            cursor: isTabDisabled ? 'not-allowed' : 'pointer'
+                                        }}>
+                                        <span className="text-xl mb-1">{t.emoji}</span>
+                                        <span className="text-[10px] uppercase tracking-wider font-bold"
+                                            style={{ color: activeTab === t.id ? 'var(--color-primary-light)' : 'var(--color-text-muted)' }}>
+                                            {t.label}
+                                        </span>
+                                        {isTabDisabled && (
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
+                                                <AlertCircle size={14} className="text-red-400" />
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {/* Right gradient/arrow indicator for scrolling forward */}
@@ -358,15 +399,11 @@ export default function AvatarPage() {
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
-                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('headwear')].map(h => {
-                                    // Base none option is always unlocked
-                                    const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id) || shopItems.some(i => i.id === h.id && i.is_default);
-                                    if (!isUnlocked) return null;
-                                    return (
-                                        <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={draft.headwear === h.id}
-                                            onClick={() => set('headwear', h.id)} />
-                                    );
-                                })}
+                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('headwear')].map(h => (
+                                    <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={draft.headwear === h.id}
+                                        disabled={disabledCategories.includes('headwear') && h.id !== 'none'} disabledReason="Bloqueado por outro item"
+                                        onClick={() => set('headwear', h.id)} />
+                                ))}
 
                                 {activeTab === 'headwear' && (draft.unlocked_items || []).length === 0 && (
                                     <div className="col-span-2 lg:col-span-3 text-center py-8 opacity-50">
