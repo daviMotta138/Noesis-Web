@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Send, Search, Check, X, Users, MessageCircle, ChevronLeft, Gift } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
-import { ProfileRing } from '../components/ProfileRing';
+import { FlippableProfilePic } from '../components/FlippableProfilePic';
+import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
+import type { AvatarConfig } from '../components/Avatar2D';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
@@ -18,8 +20,8 @@ interface FriendProfile {
     nous_coins: number;
     status: 'accepted' | 'pending_sent' | 'pending_received';
     friendshipId: string;
+    avatar_config?: Partial<AvatarConfig> | null;
     badges?: string[];
-    avatar_config?: Record<string, string>;
 }
 
 interface Message {
@@ -125,14 +127,14 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
                     style={{ color: 'var(--color-text-muted)' }}>
                     <ChevronLeft size={20} />
                 </button>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg overflow-hidden"
-                    style={{ background: 'var(--color-card)' }}>
-                    {friend.avatar_url ? (
-                        <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                        friend.display_name.charAt(0).toUpperCase()
-                    )}
-                </div>
+                <FlippableProfilePic
+                    avatarUrl={friend.avatar_url}
+                    avatarConfig={friend.avatar_config}
+                    fallbackAvatar={friend.display_name.charAt(0).toUpperCase()}
+                    size={36}
+                    autoFlip={false}
+                    className="rounded-xl overflow-hidden shadow-md flex-shrink-0"
+                />
                 <div>
                     <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>{friend.display_name}</p>
                     <p className="text-xs flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
@@ -216,7 +218,7 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
 }
 
 // ─── Friend Profile Modal ─────────────────────────────────────────────────────
-function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile; onClose: () => void; onChat: () => void }) {
+function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend: FriendProfile; onClose: () => void; onChat: () => void; onAvatarClick: () => void; }) {
     return (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }} className="flex flex-col h-full">
@@ -227,13 +229,18 @@ function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile;
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-8">
-                {/* Avatar placeholder */}
+                {/* Avatar */}
                 <div className="flex justify-center mb-6">
-                    <ProfileRing
-                        photoUrl={friend.avatar_url}
-                        avatarConfig={friend.avatar_config}
-                        size={112}
-                    />
+                    <button onClick={onAvatarClick} className="transition-transform active:scale-95">
+                        <FlippableProfilePic
+                            avatarUrl={friend.avatar_url}
+                            avatarConfig={friend.avatar_config}
+                            fallbackAvatar={friend.display_name.charAt(0).toUpperCase()}
+                            size={112} // 28 * 4
+                            autoFlip={true}
+                            className="shadow-xl flex-shrink-0"
+                        />
+                    </button>
                 </div>
 
                 <h2 className="text-2xl font-black text-display text-center text-gradient-gold mb-1">
@@ -307,6 +314,7 @@ export default function FriendsPage() {
     const [activePanel, setActivePanel] = useState<'none' | 'chat' | 'profile'>('none');
     const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
     const [giftModalFriend, setGiftModalFriend] = useState<FriendProfile | null>(null);
+    const [fullBodyFriend, setFullBodyFriend] = useState<FriendProfile | null>(null);
     const [giftStatus, setGiftStatus] = useState<{ loading: boolean; error: string | null; success: string | null }>({ loading: false, error: null, success: null });
 
     const fetchFriends = async () => {
@@ -504,14 +512,14 @@ export default function FriendsPage() {
                                 {pending.map(f => (
                                     <div key={f.id} className="flex items-center gap-3 rounded-xl p-3"
                                         style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
-                                        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base overflow-hidden"
-                                            style={{ background: 'var(--color-card)' }}>
-                                            {f.avatar_url ? (
-                                                <img src={f.avatar_url} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                f.display_name.charAt(0).toUpperCase()
-                                            )}
-                                        </div>
+                                        <FlippableProfilePic
+                                            avatarUrl={f.avatar_url}
+                                            avatarConfig={f.avatar_config}
+                                            fallbackAvatar={f.display_name.charAt(0).toUpperCase()}
+                                            size={32}
+                                            autoFlip={false}
+                                            className="rounded-xl shadow-sm flex-shrink-0"
+                                        />
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-bold truncate" style={{ color: 'var(--color-text)' }}>{f.display_name}</p>
                                             <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
@@ -564,14 +572,14 @@ export default function FriendsPage() {
                                             border: selectedFriend?.id === f.id ? '1px solid rgba(212,168,83,0.2)' : '1px solid transparent',
                                         }}>
                                         {/* Avatar image/initial */}
-                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black flex-shrink-0 overflow-hidden"
-                                            style={{ background: 'var(--color-card)', color: 'var(--color-gold)' }}>
-                                            {f.avatar_url ? (
-                                                <img src={f.avatar_url} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                                f.display_name.charAt(0).toUpperCase()
-                                            )}
-                                        </div>
+                                        <FlippableProfilePic
+                                            avatarUrl={f.avatar_url}
+                                            avatarConfig={f.avatar_config}
+                                            fallbackAvatar={f.display_name.charAt(0).toUpperCase()}
+                                            size={40}
+                                            autoFlip={false}
+                                            className="rounded-xl flex-shrink-0 shadow-sm border border-white/5"
+                                        />
                                         <div className="flex-1 min-w-0" onClick={() => openProfile(f)}>
                                             <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text)' }}>{f.display_name}</p>
                                             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
@@ -623,6 +631,7 @@ export default function FriendsPage() {
                                 friend={selectedFriend}
                                 onClose={closePanel}
                                 onChat={() => openChat(selectedFriend)}
+                                onAvatarClick={() => setFullBodyFriend(selectedFriend)}
                             />
                         </motion.div>
                     )}
@@ -697,6 +706,14 @@ export default function FriendsPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* ── Full Body Avatar Modal ── */}
+            <FullBodyAvatarModal
+                open={!!fullBodyFriend}
+                onClose={() => setFullBodyFriend(null)}
+                avatarConfig={fullBodyFriend?.avatar_config}
+                displayName={fullBodyFriend?.display_name || ''}
+            />
         </div>
     );
 }

@@ -7,7 +7,9 @@ import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { PromotionModal } from '../components/PromotionModal';
 import { DemotionModal } from '../components/DemotionModal';
-import { ProfileRing } from '../components/ProfileRing';
+import { FlippableProfilePic } from '../components/FlippableProfilePic';
+import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
+import type { AvatarConfig } from '../components/Avatar2D';
 
 function getNextSunday20h() {
     const now = new Date();
@@ -26,11 +28,11 @@ interface RankEntry {
     id: string;
     display_name: string;
     avatar_url: string | null;
-    avatar_config?: Record<string, string>;
     friend_id: string;
     streak: number;
     score: number;
     league: string;
+    avatar_config?: Partial<AvatarConfig> | null;
     isMe?: boolean;
 }
 
@@ -56,6 +58,7 @@ export default function RankingPage() {
     const [selectedPlayer, setSelectedPlayer] = useState<RankEntry | null>(null);
     const [friendStatus, setFriendStatus] = useState<'none' | 'pending_sent' | 'accepted'>('none');
     const [addingFriend, setAddingFriend] = useState(false);
+    const [fullBodyPlayer, setFullBodyPlayer] = useState<RankEntry | null>(null);
 
     // Close panel when navigating away
     useEffect(() => { setSelectedPlayer(null); }, [location.pathname]);
@@ -129,7 +132,7 @@ export default function RankingPage() {
         try {
             const { data: leagueData } = await supabase
                 .from('profiles')
-                .select('id, display_name, avatar_url, avatar_config, friend_id, streak, score, league')
+                .select('id, display_name, avatar_url, friend_id, streak, score, league, avatar_config')
                 .eq('league', tab)
                 .order('score', { ascending: false })
                 .limit(50);
@@ -226,11 +229,16 @@ export default function RankingPage() {
                                 style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)' }}
                             >
                                 <div className="flex items-start gap-4 mb-5">
-                                    <ProfileRing
-                                        photoUrl={selectedPlayer.avatar_url}
-                                        avatarConfig={selectedPlayer.avatar_config}
-                                        size={64}
-                                    />
+                                    <button onClick={() => setFullBodyPlayer(selectedPlayer)} className="transition-transform active:scale-95">
+                                        <FlippableProfilePic
+                                            avatarUrl={selectedPlayer.avatar_url}
+                                            avatarConfig={selectedPlayer.avatar_config}
+                                            fallbackAvatar={getAvatar(selectedPlayer.display_name)}
+                                            size={64}
+                                            autoFlip={true}
+                                            className="shadow-lg border border-white/10"
+                                        />
+                                    </button>
                                     <div className="flex-1 min-w-0">
                                         <h2 className="text-xl font-black text-gradient-gold truncate">{selectedPlayer.display_name}</h2>
                                         <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{selectedPlayer.league} · #{selectedPlayer.friend_id}</p>
@@ -270,6 +278,14 @@ export default function RankingPage() {
                 document.body
             )}
 
+
+            {/* Full Body Overlay */}
+            <FullBodyAvatarModal
+                open={!!fullBodyPlayer}
+                onClose={() => setFullBodyPlayer(null)}
+                avatarConfig={fullBodyPlayer?.avatar_config}
+                displayName={fullBodyPlayer?.display_name || ''}
+            />
 
             {/* Modals */}
             {

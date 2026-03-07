@@ -3,9 +3,11 @@ import type { CSSProperties } from 'react';
 
 export interface AvatarConfig {
     gender: 'man';
-    pants: 'calca-bege' | 'calca-preta';
-    shirt: 'camisa-branca' | 'camisa-preta';
+    pants: 'calca-bege' | 'calca-preta' | 'none';
+    shirt: 'camisa-branca' | 'camisa-preta' | 'none';
     footwear: 'chinelo' | 'tenis' | 'none';
+    headwear?: 'bone-azul' | 'none';
+    unlocked_items?: string[];
 }
 
 export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
@@ -13,21 +15,27 @@ export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
     pants: 'calca-bege',
     shirt: 'camisa-branca',
     footwear: 'chinelo',
+    headwear: 'none',
 };
+
+const VALID_PANTS = ['calca-bege', 'calca-preta', 'none'];
+const VALID_SHIRTS = ['camisa-branca', 'camisa-preta', 'none'];
+const VALID_FOOTWEAR = ['chinelo', 'tenis', 'none'];
+const VALID_HEADWEAR = ['bone-azul', 'none'];
 
 interface Avatar2DProps {
     config?: Partial<AvatarConfig>;
-    /** 'bust' shows ~top 55% of the avatar (chest up), 'full' shows entire body */
+    /** 'bust' shows ~top 45% of the avatar (chest up), 'full' shows entire body */
     mode?: 'bust' | 'full';
     /** If true, renders everything as a black silhouette */
     silhouette?: boolean;
-    /** Width in px. Height auto-calculated from aspect ratio. */
-    width?: number;
+    /** Optional fixed width. If omitted, use className for responsive sizing (e.g. w-full, h-full w-auto) */
+    width?: number | string;
     className?: string;
+    style?: CSSProperties;
 }
 
 // Natural PNG dimensions (boy.png is portrait, layers share same canvas)
-const NATURAL_ASPECT = 0.5; // width / height ≈ 0.5 (portrait character)
 
 /**
  * Returns the src path for each layer based on config.
@@ -38,14 +46,23 @@ function getLayers(cfg: AvatarConfig): string[] {
     const layers = [base];
 
     // Pants layer
-    if (cfg.pants) layers.push(`/avatars/man/${cfg.pants}.png`);
+    const safePants = VALID_PANTS.includes(cfg.pants) ? cfg.pants : DEFAULT_AVATAR_CONFIG.pants;
+    if (safePants && safePants !== 'none') layers.push(`/avatars/man/${safePants}.png`);
 
     // Shirt layer
-    if (cfg.shirt) layers.push(`/avatars/man/${cfg.shirt}.png`);
+    const safeShirt = VALID_SHIRTS.includes(cfg.shirt) ? cfg.shirt : DEFAULT_AVATAR_CONFIG.shirt;
+    if (safeShirt && safeShirt !== 'none') layers.push(`/avatars/man/${safeShirt}.png`);
 
-    // Footwear (mutually exclusive: chinelo OR tenis)
-    if (cfg.footwear && cfg.footwear !== 'none') {
-        layers.push(`/avatars/man/${cfg.footwear}.png`);
+    // Footwear
+    const safeFootwear = VALID_FOOTWEAR.includes(cfg.footwear as string) ? cfg.footwear : DEFAULT_AVATAR_CONFIG.footwear;
+    if (safeFootwear && safeFootwear !== 'none') {
+        layers.push(`/avatars/man/${safeFootwear}.png`);
+    }
+
+    // Headwear
+    const safeHeadwear = VALID_HEADWEAR.includes(cfg.headwear as string) ? cfg.headwear : DEFAULT_AVATAR_CONFIG.headwear;
+    if (safeHeadwear && safeHeadwear !== 'none') {
+        layers.push(`/avatars/man/${safeHeadwear}.png`);
     }
 
     return layers;
@@ -55,16 +72,12 @@ export function Avatar2D({
     config = {},
     mode = 'full',
     silhouette = false,
-    width = 160,
+    width,
     className = '',
+    style = {},
 }: Avatar2DProps) {
     const cfg: AvatarConfig = { ...DEFAULT_AVATAR_CONFIG, ...config };
     const layers = getLayers(cfg);
-
-    const height = width / NATURAL_ASPECT;
-
-    // For bust mode: show top ~52% of the character (head + shoulders + chest)
-    const containerHeight = mode === 'bust' ? height * 0.52 : height;
 
     const imgStyle: CSSProperties = {
         position: 'absolute',
@@ -84,14 +97,21 @@ export function Avatar2D({
             className={className}
             style={{
                 position: 'relative',
-                width,
-                height: containerHeight,
+                aspectRatio: mode === 'bust' ? '1 / 0.9' : '1 / 2',
                 overflow: 'hidden',
                 flexShrink: 0,
+                ...(width !== undefined ? { width } : {}),
+                ...style
             }}
         >
-            {/* Fixed-size inner container so bust crop works correctly */}
-            <div style={{ position: 'absolute', top: 0, left: 0, width, height }}>
+            {/* Inner responsive scaling layer that preserves the natural portrait proportion */}
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                aspectRatio: '1 / 2',
+            }}>
                 {layers.map((src, i) => (
                     <img
                         key={src}

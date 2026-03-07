@@ -1,24 +1,27 @@
-import { useState, useEffect } from 'react';
-import { Copy, LogOut, ChevronRight, Pencil, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { createPortal } from 'react-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Copy, LogOut, Pencil, Camera } from 'lucide-react';
+
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
-import { useNavigate } from 'react-router-dom';
 import { BadgeDisplay } from '../components/BadgeDisplay';
-import { Avatar2D, DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
+import { DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
 import type { AvatarConfig } from '../components/Avatar2D';
 import { AvatarAnnouncement } from '../components/AvatarAnnouncement';
+import { FlippableProfilePic } from '../components/FlippableProfilePic';
+import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
 
 export default function ProfilePage() {
-    const { profile, user, setUser, setProfile, fetchProfile } = useGameStore();
     const navigate = useNavigate();
+    const { profile, user, updateProfile, setUser, setProfile, fetchProfile } = useGameStore();
     const [friendsCount, setFriendsCount] = useState(0);
     const [copied, setCopied] = useState(false);
     const [fullBodyOpen, setFullBodyOpen] = useState(false);
     const [announcementOpen, setAnnouncementOpen] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Derived avatar config from profile
     const avatarConfig: AvatarConfig = {
@@ -47,6 +50,25 @@ export default function ProfilePage() {
         setAnnouncementOpen(false);
         handleDismissAnnouncement();
         navigate('/avatar');
+    };
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        try {
+            setUploading(true);
+            const file = e.target.files?.[0];
+            if (!file || !user?.id) return;
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${user.id}-${Math.random()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
+            if (uploadError) throw uploadError;
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            await updateProfile({ avatar_url: publicUrl });
+        } catch (error) {
+            console.error('Error uploading avatar:', error);
+            alert('Erro ao fazer upload da imagem.');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleLogout = async () => {
@@ -82,45 +104,60 @@ export default function ProfilePage() {
             {/* ── Avatar bust section ── */}
             <div className="px-5 pt-10 flex flex-col items-center">
                 <div className="relative mb-4">
+                    {/* Flippable Photo/Avatar */}
+                    <FlippableProfilePic
+                        avatarUrl={profile?.avatar_url || null}
+                        avatarConfig={avatarConfig}
+                        fallbackAvatar={profile?.display_name?.charAt(0).toUpperCase() || '?'}
+                        size={120}
+                        autoFlip={true}
+                        className="rounded-full flex-shrink-0"
+                    />
 
-                    {/* Bust avatar frame */}
-                    <div className="relative"
-                        style={{
-                            background: 'linear-gradient(to bottom, rgba(168,85,247,0.1), rgba(0,0,0,0))',
-                            borderRadius: '50% 50% 0 0',
-                            padding: '16px 24px 0',
-                        }}>
-                        <Avatar2D config={avatarConfig} mode="bust" width={140} />
-
-                        {/* Purple glow beneath */}
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-24 h-6 rounded-full blur-xl opacity-50"
-                            style={{ background: '#A855F7' }} />
-                    </div>
-
-                    {/* Edit pencil button */}
+                    {/* Quick photo upload button */}
                     <button
-                        onClick={() => navigate('/avatar')}
-                        className="absolute top-0 right-0 w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95 z-20"
                         style={{
-                            background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
-                            boxShadow: '0 2px 12px rgba(168,85,247,0.5)',
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
                         }}>
-                        <Pencil size={15} className="text-white" />
+                        {uploading ? (
+                            <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-text-muted) transparent transparent transparent' }} />
+                        ) : (
+                            <Camera size={14} style={{ color: 'var(--color-text)' }} />
+                        )}
                     </button>
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
                 </div>
 
-                {/* "Ver completo" button */}
-                <button
-                    onClick={() => setFullBodyOpen(true)}
-                    className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-4 rounded-full mb-4 transition-all active:scale-95"
-                    style={{
-                        color: '#C084FC',
-                        background: 'rgba(168,85,247,0.1)',
-                        border: '1px solid rgba(168,85,247,0.25)',
-                    }}>
-                    Ver completo
-                    <ChevronRight size={12} />
-                </button>
+                <div className="flex gap-2 mb-4">
+                    {/* Full body button */}
+                    <button
+                        onClick={() => setFullBodyOpen(true)}
+                        className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-4 rounded-full transition-all active:scale-95"
+                        style={{
+                            color: '#e2e8f0',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                        }}>
+                        Ver avatar completo
+                    </button>
+
+                    {/* Edit avatar button (navigates to locker) */}
+                    <button
+                        onClick={() => navigate('/avatar')}
+                        className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-4 rounded-full transition-all active:scale-95"
+                        style={{
+                            color: '#C084FC',
+                            background: 'rgba(168,85,247,0.1)',
+                            border: '1px solid rgba(168,85,247,0.25)',
+                        }}>
+                        <Pencil size={12} />
+                        Editar Roupa
+                    </button>
+                </div>
 
                 {/* Name */}
                 <h1 className="text-3xl font-black text-center tracking-tight mb-6">
@@ -152,7 +189,6 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            {/* Friend ID and Logout */}
             <div className="px-5 flex justify-between items-center mb-6">
                 <p className="text-sm font-medium text-[var(--color-text-muted)] flex items-center gap-2">
                     ID: {profile?.friend_id ?? '---'}
@@ -167,7 +203,6 @@ export default function ProfilePage() {
                 </button>
             </div>
 
-            {/* Stats row */}
             <div className="px-5 mb-6">
                 <p className="text-xs uppercase font-bold text-[var(--color-text-muted)] tracking-widest pl-2 mb-3">Resumo</p>
                 <div className="flex gap-3 w-full">
@@ -206,50 +241,12 @@ export default function ProfilePage() {
             </div>
 
             {/* ── Full-body avatar modal ── */}
-            {createPortal(
-                <AnimatePresence>
-                    {fullBodyOpen && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[200] flex items-center justify-center px-6"
-                            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(14px)' }}
-                            onClick={() => setFullBodyOpen(false)}>
-                            <motion.div
-                                initial={{ scale: 0.85, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.85, opacity: 0 }}
-                                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                                className="relative flex flex-col items-center"
-                                onClick={e => e.stopPropagation()}>
-                                {/* Close button */}
-                                <button
-                                    onClick={() => setFullBodyOpen(false)}
-                                    className="absolute -top-4 -right-4 w-9 h-9 rounded-full flex items-center justify-center z-10"
-                                    style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
-                                    <X size={16} style={{ color: 'var(--color-text-muted)' }} />
-                                </button>
-
-                                {/* Full avatar */}
-                                <div className="relative">
-                                    <Avatar2D config={avatarConfig} mode="full" width={200} />
-                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 h-8 rounded-full blur-xl opacity-40"
-                                        style={{ background: '#A855F7' }} />
-                                </div>
-
-                                <p className="mt-6 text-base font-black text-white">
-                                    {profile?.display_name || 'Estudante'}
-                                </p>
-                                <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                                    Toque fora para fechar
-                                </p>
-                            </motion.div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>,
-                document.body
-            )}
+            <FullBodyAvatarModal
+                open={fullBodyOpen}
+                onClose={() => setFullBodyOpen(false)}
+                avatarConfig={avatarConfig}
+                displayName={profile?.display_name || 'Estudante'}
+            />
 
             {/* ── New feature announcement (one-time) ── */}
             <AvatarAnnouncement
@@ -257,6 +254,6 @@ export default function ProfilePage() {
                 onCustomize={handleCustomizeFromAnnouncement}
                 onDismiss={handleDismissAnnouncement}
             />
-        </div>
+        </div >
     );
 }

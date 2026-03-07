@@ -18,6 +18,7 @@ interface ShopItem {
     borderStyle: string;
     comingSoon?: boolean;
     amount?: number;
+    image?: string;
 }
 
 const SHOP_SECTIONS = [
@@ -33,6 +34,7 @@ const SHOP_SECTIONS = [
     {
         title: 'Cosméticos Avatar',
         items: [
+            { id: 'bone-azul', name: 'Boné Azul', category: 'headwear', price: 200, desc: 'Estiloso', emoji: '🧢', bgStyle: 'linear-gradient(180deg, #1E40AF80, #1E3A8A20)', borderStyle: '#3B82F6', image: '/avatars/man/bone-azul-store.png' },
             { id: '4', name: 'Cabelo Cacheado', category: 'hair', price: 200, desc: 'Cachos exuberantes', emoji: '💇', bgStyle: 'linear-gradient(180deg, #D2691E80, #8B451320)', borderStyle: '#D2691E' },
             { id: '6', name: 'Camisa Roxa', category: 'shirt', price: 150, desc: 'Elegância', emoji: '👕', bgStyle: 'linear-gradient(180deg, #8A2BE280, #4B008220)', borderStyle: '#8A2BE2' },
             { id: '8', name: 'Óculos Red.', category: 'accessory', price: 180, desc: 'Intelectual', emoji: '🕶️', bgStyle: 'linear-gradient(180deg, #00000080, #11111120)', borderStyle: '#333333' },
@@ -135,7 +137,7 @@ export default function ShopPage() {
                 // Fetch target user
                 const { data: targetProfile, error: targetErr } = await supabase
                     .from('profiles')
-                    .select('id, shield_count, display_name')
+                    .select('id, shield_count, display_name, avatar_config')
                     .eq('friend_id', giftTargetId.trim())
                     .single();
 
@@ -148,6 +150,13 @@ export default function ShopPage() {
                 if (selectedItem.category === 'shield') {
                     await supabase.from('profiles')
                         .update({ shield_count: (targetProfile.shield_count || 0) + shieldAmt })
+                        .eq('id', targetProfile.id);
+                } else {
+                    const tCfg = targetProfile.avatar_config || {};
+                    const tUnlocked = tCfg.unlocked_items || [];
+                    const newUnlocked = Array.from(new Set([...tUnlocked, selectedItem.id]));
+                    await supabase.from('profiles')
+                        .update({ avatar_config: { ...tCfg, unlocked_items: newUnlocked } })
                         .eq('id', targetProfile.id);
                 }
 
@@ -187,7 +196,16 @@ export default function ShopPage() {
                         body: `Você tem agora ${shields + shieldAmt} escudo(s) de ofensiva.`,
                     });
                 } else {
-                    await supabase.from('profiles').update({ nous_coins: newCoins }).eq('id', user.id);
+                    const cfg = profile?.avatar_config as any || {};
+                    const unlocked = cfg.unlocked_items || [];
+                    const newUnlocked = Array.from(new Set([...unlocked, selectedItem.id]));
+
+                    await supabase.from('profiles')
+                        .update({
+                            nous_coins: newCoins,
+                            avatar_config: { ...cfg, unlocked_items: newUnlocked }
+                        })
+                        .eq('id', user.id);
                 }
 
                 setPurchaseSuccess(selectedItem);
@@ -265,6 +283,8 @@ export default function ShopPage() {
                                     <div className="flex-1 flex items-center justify-center text-6xl drop-shadow-2xl z-10" style={{ filter: item.comingSoon ? 'grayscale(100%)' : 'none' }}>
                                         {item.category === 'shield' ? (
                                             <img src={shieldImg} className="w-24 h-24 object-contain" alt="" />
+                                        ) : item.image ? (
+                                            <img src={item.image} className="w-24 h-24 object-contain" alt={item.name} />
                                         ) : item.emoji}
                                     </div>
 
@@ -322,6 +342,8 @@ export default function ShopPage() {
                                 <div className="text-8xl drop-shadow-2xl">
                                     {selectedItem.category === 'shield' ? (
                                         <img src={shieldImg} className="w-28 h-28 object-contain animate-pulse" alt="" />
+                                    ) : selectedItem.image ? (
+                                        <img src={selectedItem.image} className="w-32 h-32 object-contain" alt={selectedItem.name} />
                                     ) : selectedItem.emoji}
                                 </div>
                                 <div className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ background: 'var(--color-overlay)', color: '#fff' }}>
@@ -477,6 +499,8 @@ export default function ShopPage() {
                         <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-3xl drop-shadow-[0_0_10px_rgba(251,191,36,0.3)] shrink-0 overflow-hidden">
                             {purchaseSuccess?.category === 'shield' || giftSent?.name?.toLowerCase().includes('escudo') ? (
                                 <img src={shieldImg} className="w-8 h-8 object-contain" alt="" />
+                            ) : purchaseSuccess?.image ? (
+                                <img src={purchaseSuccess.image} className="w-8 h-8 object-contain" alt="" />
                             ) : (
                                 <span>{purchaseSuccess?.emoji || giftSent?.emoji || '🎁'}</span>
                             )}
