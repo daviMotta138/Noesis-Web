@@ -135,9 +135,12 @@ export default function AvatarPage() {
 
 
             {/* ── Left/Top Area: Avatar Display ── */}
-            <div className="flex-1 relative flex items-center justify-center pt-8 pb-32 md:pt-0 md:pb-0 overflow-hidden">
+            <div className="flex-1 relative flex items-center justify-center pt-8 pb-32 md:pt-0 md:pb-0 overflow-hidden pointer-events-none">
                 <motion.div layoutId="hero-avatar" className="h-[90%] md:h-[80%] max-h-[800px] w-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
-                    <Avatar2D config={draft} mode="full" className="h-[100%] w-auto" />
+                    <Avatar2D config={draft} mode="full" className="w-auto transform-gpu" style={{
+                        height: `233%`,
+                        transform: `translateY(0vh)`
+                    }} />
                 </motion.div>
 
                 {/* Floor shadow */}
