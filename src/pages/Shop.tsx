@@ -22,42 +22,13 @@ interface ShopItem {
     image?: string;
 }
 
-const SHOP_SECTIONS = [
-    {
-        title: 'Sobrevivência & Vantagens',
-        items: [
-            { id: 'shield_1', name: 'Escudo', category: 'shield', price: 150, desc: 'Protege 1 ofensiva', emoji: '🛡️', bgStyle: 'linear-gradient(180deg, #A0522D80, #8B451320)', borderStyle: '#CD7F32', amount: 1 },
-            { id: 'shield_3', name: 'Dose Tripla', category: 'shield', price: 400, desc: 'Pacote com 3 escudos', emoji: '🛡️', bgStyle: 'linear-gradient(180deg, #80808080, #A9A9A920)', borderStyle: '#C0C0C0', amount: 3 },
-            { id: 'shield_5', name: 'Kit Sobrevivência', category: 'shield', price: 650, desc: 'Pacote com 5 escudos', emoji: '🛡️', bgStyle: 'linear-gradient(180deg, #B8860B80, #DAA52020)', borderStyle: '#FFD700', amount: 5 },
-            { id: 'shield_10', name: 'Muralha', category: 'shield', price: 1200, desc: 'Pacote com 10 escudos', emoji: '🛡️', bgStyle: 'linear-gradient(180deg, #32CD3280, #228B2220)', borderStyle: '#00FF00', amount: 10 },
-        ] as ShopItem[]
-    },
-    {
-        title: 'Cosméticos Avatar',
-        items: [
-            { id: 'bone-azul', name: 'Boné Azul', category: 'headwear', price: 200, desc: 'Estiloso', emoji: '🧢', bgStyle: 'linear-gradient(180deg, #1E40AF80, #1E3A8A20)', borderStyle: '#3B82F6', image: '/avatars/man/bone-azul-store.png' },
-            { id: '4', name: 'Cabelo Cacheado', category: 'hair', price: 200, desc: 'Cachos exuberantes', emoji: '💇', bgStyle: 'linear-gradient(180deg, #D2691E80, #8B451320)', borderStyle: '#D2691E' },
-            { id: '6', name: 'Camisa Roxa', category: 'shirt', price: 150, desc: 'Elegância', emoji: '👕', bgStyle: 'linear-gradient(180deg, #8A2BE280, #4B008220)', borderStyle: '#8A2BE2' },
-            { id: '8', name: 'Óculos Red.', category: 'accessory', price: 180, desc: 'Intelectual', emoji: '🕶️', bgStyle: 'linear-gradient(180deg, #00000080, #11111120)', borderStyle: '#333333' },
-            { id: '9', name: 'Coroa Dourada', category: 'accessory', price: 500, desc: 'Para mestres', emoji: '👑', bgStyle: 'linear-gradient(180deg, #FFD70080, #DAA52020)', borderStyle: '#FFD700' },
-            { id: '10', name: 'Tênis Branco', category: 'shoes', price: 120, desc: 'Atleta', emoji: '👟', bgStyle: 'linear-gradient(180deg, #FFFFFF80, #CCCCCC20)', borderStyle: '#FFFFFF' },
-            { id: 'aura_1', name: 'Aura Chamas', category: 'effect', price: 2000, desc: 'Efeito Visual', emoji: '🔥', bgStyle: 'linear-gradient(180deg, #FF450080, #8B000020)', borderStyle: '#FF4500', comingSoon: true },
-        ] as ShopItem[]
-    },
-    {
-        title: 'Itens Místicos',
-        items: [
-            { id: '12', name: 'Espada Mág.', category: 'item', price: 350, desc: 'Poder puro', emoji: '🗡️', bgStyle: 'linear-gradient(180deg, #4682B480, #00008020)', borderStyle: '#4682B4' },
-            { id: '13', name: 'Grimório', category: 'item', price: 350, desc: 'Sabedoria', emoji: '📖', bgStyle: 'linear-gradient(180deg, #8B008B80, #4B008220)', borderStyle: '#8B008B' },
-            { id: '14', name: 'Cajado', category: 'item', price: 400, desc: 'Controle', emoji: '🪄', bgStyle: 'linear-gradient(180deg, #00808080, #00404020)', borderStyle: '#00FA9A' },
-            { id: 'pet_1', name: 'Mascote Coruja', category: 'pet', price: 1500, desc: 'Companheiro', emoji: '🦉', bgStyle: 'linear-gradient(180deg, #A0522D80, #8B451320)', borderStyle: '#CD853F', comingSoon: true },
-        ] as ShopItem[]
-    }
-];
+// We will dynamically fetch this from Supabase now.
 
 export default function ShopPage() {
     const navigate = useNavigate();
     const { profile, user, fetchProfile } = useGameStore();
+    const [shopSections, setShopSections] = useState<{ title: string, items: ShopItem[] }[]>([]);
+    const [loadingShop, setLoadingShop] = useState(true);
     const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
     const [purchasing, setPurchasing] = useState(false);
     const [quantity, setQuantity] = useState(1);
@@ -71,6 +42,75 @@ export default function ShopPage() {
     const [loadingFriends, setLoadingFriends] = useState(false);
     const [purchaseSuccess, setPurchaseSuccess] = useState<ShopItem | null>(null);
     const [giftSent, setGiftSent] = useState<{ name: string; target: string; emoji: string } | null>(null);
+
+    // Fetch dynamic shop items
+    useEffect(() => {
+        const fetchShop = async () => {
+            setLoadingShop(true);
+            const { data, error } = await supabase.from('shop_items').select('*').order('price_nous', { ascending: true });
+            if (error) {
+                console.error('Error fetching shop items:', error);
+                setLoadingShop(false);
+                return;
+            }
+
+            // Map generic database items into the UI interface
+            const mappedItems: ShopItem[] = data.map((item: any) => {
+                let amount = 1;
+                let bgStyle = 'linear-gradient(180deg, #FFFFFF80, #CCCCCC20)';
+                let borderStyle = '#FFFFFF';
+                let emoji = '📦';
+
+                // Attempt to infer emoji & styles from type or ID heuristically
+                if (item.category === 'shield') {
+                    emoji = '🛡️';
+                    bgStyle = 'linear-gradient(180deg, #A0522D80, #8B451320)';
+                    borderStyle = '#FFD700';
+                    if (item.id === 'shield_3') amount = 3;
+                    if (item.id === 'shield_5') amount = 5;
+                    if (item.id === 'shield_10') amount = 10;
+                } else if (item.category === 'headwear') { emoji = '🧢'; borderStyle = '#3B82F6'; bgStyle = 'linear-gradient(180deg, #1E40AF80, #1E3A8A20)'; }
+                else if (item.category === 'hair') { emoji = '💇'; borderStyle = '#D2691E'; bgStyle = 'linear-gradient(180deg, #D2691E80, #8B451320)'; }
+                else if (item.category === 'shirt') { emoji = '👕'; borderStyle = '#8A2BE2'; bgStyle = 'linear-gradient(180deg, #8A2BE280, #4B008220)'; }
+                else if (item.category === 'pants') { emoji = '👖'; borderStyle = '#4682B4'; bgStyle = 'linear-gradient(180deg, #4682B480, #00008020)'; }
+                else if (item.category === 'coat') { emoji = '🧥'; borderStyle = '#B22222'; bgStyle = 'linear-gradient(180deg, #B2222280, #80000020)'; }
+                else if (item.category === 'shoes') { emoji = '👟'; borderStyle = '#FFFFFF'; bgStyle = 'linear-gradient(180deg, #FFFFFF80, #CCCCCC20)'; }
+                else if (item.category === 'accessory') { emoji = '🕶️'; borderStyle = '#333333'; bgStyle = 'linear-gradient(180deg, #00000080, #11111120)'; }
+                else if (item.category === 'effect') { emoji = '✨'; borderStyle = '#FF4500'; bgStyle = 'linear-gradient(180deg, #FF450080, #8B000020)'; }
+                else if (item.category === 'item') { emoji = '🗡️'; borderStyle = '#4682B4'; bgStyle = 'linear-gradient(180deg, #4682B480, #00008020)'; }
+                else if (item.category === 'pet') { emoji = '🦉'; borderStyle = '#CD853F'; bgStyle = 'linear-gradient(180deg, #A0522D80, #8B451320)'; }
+
+                // The preview_url from DB overrides generic emoji if present later
+                return {
+                    id: item.id,
+                    name: item.name,
+                    category: item.category,
+                    price: item.price_nous,
+                    desc: item.description,
+                    emoji,
+                    bgStyle,
+                    borderStyle,
+                    amount,
+                    image: item.preview_url || undefined
+                };
+            });
+
+            // Group them
+            const survival = mappedItems.filter(i => i.category === 'shield');
+            const cosmetics = mappedItems.filter(i => ['headwear', 'hair', 'shirt', 'pants', 'coat', 'shoes', 'accessory', 'effect'].includes(i.category));
+            const mystics = mappedItems.filter(i => ['item', 'pet'].includes(i.category));
+
+            setShopSections([
+                { title: 'Sobrevivência & Vantagens', items: survival },
+                { title: 'Cosméticos Avatar', items: cosmetics },
+                { title: 'Itens Místicos', items: mystics },
+            ].filter(sec => sec.items.length > 0));
+
+            setLoadingShop(false);
+        };
+
+        fetchShop();
+    }, []);
 
     // Fetch friends when gifting opens
     useEffect(() => {
@@ -252,73 +292,79 @@ export default function ShopPage() {
                 </div>
             )}
 
-            {/* Fortnite-Style Horizontal Layout */}
-            <div className="space-y-8">
-                {SHOP_SECTIONS.map((section, idx) => (
-                    <div key={idx}>
-                        <div className="px-5 mb-3 flex items-center gap-2">
-                            <h2 className="text-sm font-black uppercase italic tracking-widest drop-shadow-md text-[var(--color-text)]">
-                                {section.title}
-                            </h2>
-                            <div className="flex-1 h-px bg-[var(--color-border)]" />
-                        </div>
+            {/* Item Grid logic mapping over shopSections */}
+            {loadingShop ? (
+                <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                    <Loader2 className="animate-spin w-8 h-8 mb-4" />
+                    <p className="text-xs uppercase tracking-widest font-bold">Carregando Estoque...</p>
+                </div>
+            ) : (
+                <div className="space-y-12">
+                    {shopSections.map((section, idx) => (
+                        <div key={idx} className="px-5">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-white/10" />
+                                <h2 className="text-sm font-black uppercase tracking-widest text-white/50">{section.title}</h2>
+                                <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-white/10" />
+                            </div>
 
-                        {/* Horizontal Scroll Area */}
-                        <div className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x" style={{ scrollbarWidth: 'none' }}>
-                            {section.items.map((item) => {
-                                // Check if user already owns the cosmetic item
-                                const isOwned = item.category !== 'shield' && item.category !== 'item' && item.category !== 'pet' && ((profile?.avatar_config as any)?.unlocked_items as string[] || []).includes(item.id);
+                            {/* Horizontal Scroll Area */}
+                            <div className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x" style={{ scrollbarWidth: 'none' }}>
+                                {section.items.map((item) => {
+                                    // Check if user already owns the cosmetic item
+                                    const isOwned = item.category !== 'shield' && item.category !== 'item' && item.category !== 'pet' && ((profile?.avatar_config as any)?.unlocked_items as string[] || []).includes(item.id);
 
-                                return (
-                                    <motion.button
-                                        key={item.id}
-                                        whileHover={{ scale: item.comingSoon ? 1 : 1.02 }}
-                                        whileTap={{ scale: item.comingSoon ? 1 : 0.98 }}
-                                        onClick={() => !item.comingSoon && setSelectedItem(item)}
-                                        className="relative flex-shrink-0 w-36 h-56 rounded-2xl flex flex-col snap-start overflow-hidden text-left"
-                                        style={{
-                                            background: item.comingSoon ? '#1A1D30' : item.bgStyle,
-                                            border: `2px solid ${item.comingSoon ? '#333' : item.borderStyle}`,
-                                            opacity: item.comingSoon ? 0.6 : 1,
-                                            boxShadow: item.comingSoon ? 'none' : `0 4px 20px ${item.borderStyle}40`
-                                        }}
-                                    >
-                                        {/* Item Rarity Glow equivalent */}
-                                        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                                    return (
+                                        <motion.button
+                                            key={item.id}
+                                            whileHover={{ scale: item.comingSoon ? 1 : 1.02 }}
+                                            whileTap={{ scale: item.comingSoon ? 1 : 0.98 }}
+                                            onClick={() => !item.comingSoon && setSelectedItem(item)}
+                                            className="relative flex-shrink-0 w-36 h-56 rounded-2xl flex flex-col snap-start overflow-hidden text-left"
+                                            style={{
+                                                background: item.comingSoon ? '#1A1D30' : item.bgStyle,
+                                                border: `2px solid ${item.comingSoon ? '#333' : item.borderStyle}`,
+                                                opacity: item.comingSoon ? 0.6 : 1,
+                                                boxShadow: item.comingSoon ? 'none' : `0 4px 20px ${item.borderStyle}40`
+                                            }}
+                                        >
+                                            {/* Item Rarity Glow equivalent */}
+                                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
 
-                                        <div className="flex-1 flex items-center justify-center text-6xl drop-shadow-2xl z-10" style={{ filter: item.comingSoon ? 'grayscale(100%)' : 'none' }}>
-                                            {item.category === 'shield' ? (
-                                                <img src={shieldImg} className="w-24 h-24 object-contain" alt="" />
-                                            ) : item.image ? (
-                                                <img src={item.image} className="w-24 h-24 object-contain" alt={item.name} />
-                                            ) : item.emoji}
-                                        </div>
-
-                                        <div className="p-3 z-10">
-                                            <p className="font-black text-sm text-white leading-tight uppercase italic">{item.name}</p>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                {item.comingSoon ? (
-                                                    <span className="text-[10px] font-bold text-gray-400 bg-black/40 px-2 py-0.5 rounded-sm uppercase tracking-wider">Em Breve</span>
-                                                ) : isOwned ? (
-                                                    <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">Adquirido</span>
-                                                ) : (
-                                                    <>
-                                                        <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
-                                                        <span className="text-xs font-black text-white">{item.price}</span>
-                                                    </>
-                                                )}
+                                            <div className="flex-1 flex items-center justify-center text-6xl drop-shadow-2xl z-10" style={{ filter: item.comingSoon ? 'grayscale(100%)' : 'none' }}>
+                                                {item.category === 'shield' ? (
+                                                    <img src={shieldImg} className="w-24 h-24 object-contain" alt="" />
+                                                ) : item.image ? (
+                                                    <img src={item.image} className="w-24 h-24 object-contain" alt={item.name} />
+                                                ) : item.emoji}
                                             </div>
-                                        </div>
 
-                                        {/* Glossy overlay */}
-                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
-                                    </motion.button>
-                                );
-                            })}
+                                            <div className="p-3 z-10">
+                                                <p className="font-black text-sm text-white leading-tight uppercase italic">{item.name}</p>
+                                                <div className="flex items-center gap-1 mt-1">
+                                                    {item.comingSoon ? (
+                                                        <span className="text-[10px] font-bold text-gray-400 bg-black/40 px-2 py-0.5 rounded-sm uppercase tracking-wider">Em Breve</span>
+                                                    ) : isOwned ? (
+                                                        <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">Adquirido</span>
+                                                    ) : (
+                                                        <>
+                                                            <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
+                                                            <span className="text-xs font-black text-white">{item.price}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Glossy overlay */}
+                                            <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
+                                        </motion.button>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {/* Item Focus Modal (Fortnite Style Purchase Screen) */}
             <AnimatePresence>

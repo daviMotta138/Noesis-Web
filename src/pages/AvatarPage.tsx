@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
+import { supabase } from '../lib/supabase';
 import { Avatar2D, DEFAULT_AVATAR_CONFIG, type AvatarConfig } from '../components/Avatar2D';
 
 const PANTS_OPTIONS = [
@@ -28,6 +29,21 @@ const HEADWEAR_OPTIONS = [
     { id: 'none' as const, label: 'Sem Boné', isNone: true },
 ];
 
+const OUTFITS_OPTIONS = [
+    {
+        id: 'outfit-casual', label: 'Casual Básico', emoji: '👕',
+        items: { shirt: 'camisa-branca' as const, pants: 'calca-bege' as const, footwear: 'chinelo' as const, headwear: 'none' as const }
+    },
+    {
+        id: 'outfit-skatista', label: 'Skatista', emoji: '🛹',
+        items: { shirt: 'camisa-preta' as const, pants: 'calca-preta' as const, footwear: 'tenis' as const, headwear: 'bone-azul' as const }
+    },
+    {
+        id: 'outfit-none', label: 'Desequipar Tudo', isNone: true,
+        items: { shirt: 'none' as const, pants: 'none' as const, footwear: 'none' as const, headwear: 'none' as const }
+    }
+];
+
 const GENDER_OPTIONS = [
     { id: 'man' as const, label: 'Menino', image: '/avatars/man/boy.png', available: true },
     { id: 'woman' as const, label: 'Menina', emoji: '👧', available: false },
@@ -44,8 +60,27 @@ export default function AvatarPage() {
     const [saving, setSaving] = useState(false);
 
     // Determines active sub-menu for mobile grid.
-    const [activeTab, setActiveTab] = useState<'gender' | 'shirt' | 'pants' | 'footwear' | 'headwear'>('shirt');
+    const [activeTab, setActiveTab] = useState<'outfits' | 'gender' | 'shirt' | 'coat' | 'pants' | 'footwear' | 'headwear'>('outfits');
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    const [shopItems, setShopItems] = useState<any[]>([]);
+
+    useEffect(() => {
+        supabase.from('shop_items').select('*').then(({ data }) => {
+            if (data) setShopItems(data);
+        });
+    }, []);
+
+    const getDynamicOptions = (cat: string) => {
+        const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
+        return shopItems
+            .filter(i => i.category === cat && unlocked.includes(i.id))
+            .map(i => ({
+                id: i.asset_key || i.id,
+                label: i.name,
+                image: i.preview_url || i.asset_key || ''
+            }));
+    };
 
     const [flashKey, setFlashKey] = useState(0);
 
@@ -57,7 +92,7 @@ export default function AvatarPage() {
 
     const set = <K extends keyof AvatarConfig>(key: K, val: AvatarConfig[K]) => {
         if (draft[key] !== val) {
-            setDraft(prev => ({ ...prev, [key]: val }));
+            setDraft((prev: any) => ({ ...prev, [key]: val } as any));
             setFlashKey(prev => prev + 1);
         }
     };
@@ -201,9 +236,11 @@ export default function AvatarPage() {
 
                         <div ref={scrollRef} className="px-5 flex gap-2 overflow-x-auto pb-2 relative z-10" style={{ scrollbarWidth: 'none' }}>
                             {[
+                                { id: 'outfits', label: 'Conjuntos', emoji: '🛍️' },
                                 { id: 'gender', label: 'Personagem', emoji: '👦' },
                                 { id: 'hair', label: 'Cabelo', emoji: '💇' },
                                 { id: 'shirt', label: 'Superior', emoji: '👕' },
+                                { id: 'coat', label: 'Casacos', emoji: '🧥' },
                                 { id: 'pants', label: 'Inferior', emoji: '👖' },
                                 { id: 'footwear', label: 'Calçados', emoji: '👟' },
                                 { id: 'headwear', label: 'Acessórios', emoji: '🧢' },
@@ -248,29 +285,42 @@ export default function AvatarPage() {
                                 transition={{ duration: 0.2 }}
                                 className="grid grid-cols-2 lg:grid-cols-3 gap-3"
                             >
+                                {activeTab === 'outfits' && OUTFITS_OPTIONS.map(o => (
+                                    <ItemOption key={o.id} id={o.id} emoji={(o as any).emoji} isNone={(o as any).isNone} label={o.label} active={false}
+                                        onClick={() => {
+                                            setDraft(prev => ({ ...prev, ...o.items }));
+                                            setFlashKey(prev => prev + 1);
+                                        }} />
+                                ))}
+
                                 {activeTab === 'gender' && GENDER_OPTIONS.map(g => (
                                     <ItemOption key={g.id} id={g.id} image={(g as any).image} emoji={(g as any).emoji} label={g.label} active={draft.gender === g.id}
                                         disabled={!g.available} onClick={() => g.available && set('gender', 'man')} />
                                 ))}
 
-                                {activeTab === 'shirt' && SHIRT_OPTIONS.map(s => (
+                                {activeTab === 'shirt' && [...SHIRT_OPTIONS, ...getDynamicOptions('shirt')].map(s => (
                                     <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={draft.shirt === s.id}
                                         onClick={() => set('shirt', s.id)} />
                                 ))}
 
-                                {activeTab === 'pants' && PANTS_OPTIONS.map(p => (
+                                {activeTab === 'coat' && [{ id: 'none', label: 'Sem Casaco', isNone: true }, ...getDynamicOptions('coat')].map(c => (
+                                    <ItemOption key={c.id} id={c.id} image={(c as any).image} isNone={(c as any).isNone} label={c.label} active={draft.coat === c.id || (!draft.coat && c.id === 'none')}
+                                        onClick={() => set('coat', c.id)} />
+                                ))}
+
+                                {activeTab === 'pants' && [...PANTS_OPTIONS, ...getDynamicOptions('pants')].map(p => (
                                     <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={draft.pants === p.id}
                                         onClick={() => set('pants', p.id)} />
                                 ))}
 
-                                {activeTab === 'footwear' && FOOTWEAR_OPTIONS.map(f => (
+                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS, ...getDynamicOptions('shoes')].map(f => (
                                     <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={draft.footwear === f.id}
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
-                                {activeTab === 'headwear' && HEADWEAR_OPTIONS.map(h => {
-                                    // Only render if it's 'none' or exists in unlocked_items
-                                    const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id);
+                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS, ...getDynamicOptions('headwear')].map(h => {
+                                    // Base none option is always unlocked
+                                    const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id) || shopItems.some(i => i.id === h.id);
                                     if (!isUnlocked) return null;
                                     return (
                                         <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={draft.headwear === h.id}
@@ -280,7 +330,7 @@ export default function AvatarPage() {
 
                                 {activeTab === 'headwear' && (draft.unlocked_items || []).length === 0 && (
                                     <div className="col-span-2 lg:col-span-3 text-center py-8 opacity-50">
-                                        <p className="text-sm font-bold tracking-widest uppercase mb-2">Sem chapéus desbloqueados</p>
+                                        <p className="text-sm font-bold tracking-widest uppercase mb-2">Sem chapéus extras</p>
                                         <p className="text-xs">Visite a Loja para adquirir novos itens!</p>
                                     </div>
                                 )}

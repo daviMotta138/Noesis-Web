@@ -3,10 +3,11 @@ import type { CSSProperties } from 'react';
 
 export interface AvatarConfig {
     gender: 'man';
-    pants: 'calca-bege' | 'calca-preta' | 'none';
-    shirt: 'camisa-branca' | 'camisa-preta' | 'none';
-    footwear: 'chinelo' | 'tenis' | 'none';
-    headwear?: 'bone-azul' | 'none';
+    pants: string;
+    shirt: string;
+    footwear: string;
+    headwear?: string;
+    coat?: string;
     unlocked_items?: string[];
 }
 
@@ -16,6 +17,7 @@ export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
     shirt: 'camisa-branca',
     footwear: 'chinelo',
     headwear: 'none',
+    coat: 'none',
 };
 
 const VALID_PANTS = ['calca-bege', 'calca-preta', 'none'];
@@ -45,32 +47,41 @@ function getLayers(cfg: AvatarConfig): string[] {
     const base = `/avatars/man/boy.png`;
     const layers = [base];
 
-    // Avatar (Base Layer) is already pushed
+    // Helper to resolve layer path
+    const resolvePath = (val: string | undefined, validList: string[], def: string) => {
+        if (!val || val === 'none') return null;
+        if (val.startsWith('http')) return val; // Dynamic image from Admin DB
+        const safe = validList.includes(val) ? val : def;
+        return safe !== 'none' ? `/avatars/man/${safe}.png` : null;
+    };
 
     // "chinelo" footwear goes UNDER pants
-    const safeFootwear = VALID_FOOTWEAR.includes(cfg.footwear as string) ? cfg.footwear : DEFAULT_AVATAR_CONFIG.footwear;
-    if (safeFootwear === 'chinelo') {
-        layers.push(`/avatars/man/chinelo.png`);
+    const footerPath = cfg.footwear?.startsWith('http') ? cfg.footwear : (VALID_FOOTWEAR.includes(cfg.footwear) ? cfg.footwear : DEFAULT_AVATAR_CONFIG.footwear);
+    if (footerPath === 'chinelo' || footerPath?.includes('chinelo')) {
+        layers.push(footerPath.startsWith('http') ? footerPath : `/avatars/man/chinelo.png`);
     }
 
     // Pants layer
-    const safePants = VALID_PANTS.includes(cfg.pants) ? cfg.pants : DEFAULT_AVATAR_CONFIG.pants;
-    if (safePants && safePants !== 'none') layers.push(`/avatars/man/${safePants}.png`);
+    const pants = resolvePath(cfg.pants, VALID_PANTS, DEFAULT_AVATAR_CONFIG.pants);
+    if (pants) layers.push(pants);
 
     // Shirt layer
-    const safeShirt = VALID_SHIRTS.includes(cfg.shirt) ? cfg.shirt : DEFAULT_AVATAR_CONFIG.shirt;
-    if (safeShirt && safeShirt !== 'none') layers.push(`/avatars/man/${safeShirt}.png`);
+    const shirt = resolvePath(cfg.shirt, VALID_SHIRTS, DEFAULT_AVATAR_CONFIG.shirt);
+    if (shirt) layers.push(shirt);
 
-    // "tenis" footwear goes OVER pants and shirts
-    if (safeFootwear === 'tenis') {
-        layers.push(`/avatars/man/tenis.png`);
+    // Coat layer (Casacos) goes over shirt
+    if (cfg.coat && cfg.coat !== 'none') {
+        layers.push(cfg.coat.startsWith('http') ? cfg.coat : `/avatars/man/${cfg.coat}.png`);
+    }
+
+    // "tenis" and other footwear goes OVER pants and shirts/coats
+    if (footerPath && footerPath !== 'none' && footerPath !== 'chinelo' && !footerPath.includes('chinelo')) {
+        layers.push(footerPath.startsWith('http') ? footerPath : `/avatars/man/${footerPath}.png`);
     }
 
     // Headwear
-    const safeHeadwear = VALID_HEADWEAR.includes(cfg.headwear as string) ? cfg.headwear : DEFAULT_AVATAR_CONFIG.headwear;
-    if (safeHeadwear && safeHeadwear !== 'none') {
-        layers.push(`/avatars/man/${safeHeadwear}.png`);
-    }
+    const headwear = resolvePath(cfg.headwear, VALID_HEADWEAR, DEFAULT_AVATAR_CONFIG.headwear || 'none');
+    if (headwear) layers.push(headwear);
 
     return layers;
 }
