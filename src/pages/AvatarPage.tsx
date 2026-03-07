@@ -1,35 +1,35 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Check, Sparkles, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { Avatar2D, DEFAULT_AVATAR_CONFIG, type AvatarConfig } from '../components/Avatar2D';
 
 const PANTS_OPTIONS = [
-    { id: 'calca-bege' as const, label: 'Bege', color: '#C4A882' },
-    { id: 'calca-preta' as const, label: 'Preta', color: '#1E1E1E' },
-    { id: 'none' as const, label: 'Sem', color: 'transparent' },
+    { id: 'calca-bege' as const, label: 'Bege', image: '/avatars/man/calca-bege.png' },
+    { id: 'calca-preta' as const, label: 'Preta', image: '/avatars/man/calca-preta.png' },
+    { id: 'none' as const, label: 'Sem', isNone: true },
 ];
 
 const SHIRT_OPTIONS = [
-    { id: 'camisa-branca' as const, label: 'Branca', color: '#F0F0F0' },
-    { id: 'camisa-preta' as const, label: 'Preta', color: '#1E1E1E' },
-    { id: 'none' as const, label: 'Sem', color: 'transparent' },
+    { id: 'camisa-branca' as const, label: 'Branca', image: '/avatars/man/camisa-branca.png' },
+    { id: 'camisa-preta' as const, label: 'Preta', image: '/avatars/man/camisa-preta.png' },
+    { id: 'none' as const, label: 'Sem', isNone: true },
 ];
 
 const FOOTWEAR_OPTIONS = [
-    { id: 'chinelo' as const, label: 'Chinelo', emoji: '🩴' },
-    { id: 'tenis' as const, label: 'Tênis', emoji: '👟' },
-    { id: 'none' as const, label: 'Nenhum', emoji: '🦶' },
+    { id: 'chinelo' as const, label: 'Chinelo', image: '/avatars/man/chinelo.png' },
+    { id: 'tenis' as const, label: 'Tênis', image: '/avatars/man/tenis.png' },
+    { id: 'none' as const, label: 'Nenhum', isNone: true },
 ];
 
 const HEADWEAR_OPTIONS = [
-    { id: 'bone-azul' as const, label: 'Boné Azul', emoji: '🧢' },
-    { id: 'none' as const, label: 'Sem Boné', emoji: '✖️' },
+    { id: 'bone-azul' as const, label: 'Boné Azul', image: '/avatars/man/bone-azul.png' },
+    { id: 'none' as const, label: 'Sem Boné', isNone: true },
 ];
 
 const GENDER_OPTIONS = [
-    { id: 'man' as const, label: 'Menino', emoji: '👦', available: true },
+    { id: 'man' as const, label: 'Menino', image: '/avatars/man/boy.png', available: true },
     { id: 'woman' as const, label: 'Menina', emoji: '👧', available: false },
 ];
 
@@ -45,9 +45,21 @@ export default function AvatarPage() {
 
     // Determines active sub-menu for mobile grid.
     const [activeTab, setActiveTab] = useState<'gender' | 'shirt' | 'pants' | 'footwear' | 'headwear'>('shirt');
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const [flashKey, setFlashKey] = useState(0);
+
+    const scrollTabs = (dir: 'left' | 'right') => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollBy({ left: dir === 'right' ? 150 : -150, behavior: 'smooth' });
+        }
+    };
 
     const set = <K extends keyof AvatarConfig>(key: K, val: AvatarConfig[K]) => {
-        setDraft(prev => ({ ...prev, [key]: val }));
+        if (draft[key] !== val) {
+            setDraft(prev => ({ ...prev, [key]: val }));
+            setFlashKey(prev => prev + 1);
+        }
     };
 
     const handleSave = async () => {
@@ -63,28 +75,7 @@ export default function AvatarPage() {
     };
 
     // Sub-components for options to keep render clean
-    const ColorSwatch = ({ color, active, onClick, label, id }: any) => (
-        <button
-            onClick={onClick}
-            className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all"
-            style={{
-                background: active ? 'rgba(168,85,247,0.15)' : 'var(--color-glass)',
-                border: active ? '2px solid #A855F7' : '2px solid var(--color-border)',
-                flex: '1 1 0px',
-            }}>
-            <div className="w-8 h-8 rounded-full border-2"
-                style={{
-                    background: color,
-                    borderColor: id === 'camisa-branca' ? '#888' : active ? '#A855F7' : 'var(--color-border)'
-                }} />
-            <span className="text-xs font-bold truncate max-w-full px-1"
-                style={{ color: active ? '#C084FC' : 'var(--color-text-sub)' }}>
-                {label}
-            </span>
-        </button>
-    );
-
-    const EmojiOption = ({ emoji, active, onClick, label, disabled = false }: any) => (
+    const ItemOption = ({ image, emoji, isNone, active, onClick, label, disabled = false }: any) => (
         <button
             onClick={onClick}
             disabled={disabled}
@@ -94,8 +85,17 @@ export default function AvatarPage() {
                 border: active && !disabled ? '2px solid #A855F7' : '2px solid var(--color-border)',
                 opacity: disabled ? 0.45 : 1,
                 flex: '1 1 0px',
+                minHeight: '110px'
             }}>
-            <span className="text-3xl drop-shadow-md">{emoji}</span>
+            <div className="flex-1 flex items-center justify-center w-full h-12 relative pointer-events-none">
+                {isNone ? (
+                    <span className="text-3xl opacity-30 drop-shadow-md">✖️</span>
+                ) : image ? (
+                    <img src={image} className="w-full h-full object-contain drop-shadow-md" alt={label} />
+                ) : (
+                    <span className="text-3xl drop-shadow-md">{emoji}</span>
+                )}
+            </div>
             <span className="text-xs font-bold truncate max-w-full px-1"
                 style={{ color: active && !disabled ? '#C084FC' : 'var(--color-text-sub)' }}>
                 {label}
@@ -137,10 +137,39 @@ export default function AvatarPage() {
             {/* ── Left/Top Area: Avatar Display ── */}
             <div className="flex-1 relative flex items-center justify-center pt-8 pb-32 md:pt-0 md:pb-0 overflow-hidden pointer-events-none">
                 <motion.div layoutId="hero-avatar" className="h-[90%] md:h-[80%] max-h-[800px] w-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
-                    <Avatar2D config={draft} mode="full" className="w-auto transform-gpu" style={{
+                    <Avatar2D config={draft} mode="full" className="w-auto transform-gpu relative z-10" style={{
                         height: `233%`,
                         transform: `translateY(0vh)`
                     }} />
+
+                    {/* Blue Firefly Particle Transition */}
+                    <AnimatePresence mode="wait">
+                        <div key={flashKey} className="absolute inset-0 z-30 pointer-events-none overflow-hidden rounded-3xl">
+                            {[...Array(15)].map((_, i) => (
+                                <motion.div
+                                    key={i}
+                                    className="absolute w-2 h-2 bg-blue-400 rounded-full"
+                                    style={{
+                                        left: `${10 + (Math.sin(i * 45) * 40 + 40)}%`, // Distribute roughly 10-90% width
+                                        top: `${70 + (Math.cos(i * 12) * 20)}%`,   // Start near bottom
+                                        boxShadow: '0 0 15px 4px rgba(96, 165, 250, 0.8)'
+                                    }}
+                                    initial={{ opacity: 0, scale: 0, y: 0 }}
+                                    animate={{
+                                        opacity: [0, 1, 0],
+                                        scale: [0, 1.5, 0],
+                                        y: -100 - (Math.abs(Math.sin(i)) * 150), // Fly upwards differently
+                                        x: (Math.sin(i * 2) * 50) // Drift left or right slightly
+                                    }}
+                                    transition={{
+                                        duration: 0.6 + (Math.abs(Math.cos(i)) * 0.4), // 0.6 - 1.0s fast burst
+                                        ease: "easeOut",
+                                        delay: Math.abs(Math.sin(i * 7)) * 0.1 // Staggered start 0-0.1s
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </AnimatePresence>
                 </motion.div>
 
                 {/* Floor shadow */}
@@ -156,27 +185,56 @@ export default function AvatarPage() {
 
                 <div className="flex-1 flex flex-col">
                     {/* Horizontal Option Tabs */}
-                    <div className="px-5 mb-6 flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-                        {[
-                            { id: 'gender', label: 'Personagem', emoji: '👦' },
-                            { id: 'shirt', label: 'Camisa', emoji: '👕' },
-                            { id: 'pants', label: 'Calça', emoji: '👖' },
-                            { id: 'footwear', label: 'Calçado', emoji: '👟' },
-                            { id: 'headwear', label: 'Chapéu', emoji: '🧢' },
-                        ].map(t => (
-                            <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-                                className="flex flex-col items-center justify-center p-3 rounded-2xl min-w-[80px] transition-all bg-white/5 whitespace-nowrap"
-                                style={{
-                                    border: `1px solid ${activeTab === t.id ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)'}`,
-                                    background: activeTab === t.id ? 'rgba(168,85,247,0.1)' : 'var(--color-glass)',
-                                }}>
-                                <span className="text-xl mb-1">{t.emoji}</span>
-                                <span className="text-[10px] uppercase tracking-wider font-bold"
-                                    style={{ color: activeTab === t.id ? 'var(--color-primary-light)' : 'var(--color-text-muted)' }}>
-                                    {t.label}
-                                </span>
-                            </button>
-                        ))}
+                    <div className="relative mb-6">
+                        {/* Left gradient/arrow indicator for scrolling back */}
+                        <div
+                            onClick={() => scrollTabs('left')}
+                            className="absolute left-0 top-0 bottom-2 w-16 bg-gradient-to-r from-[#111]/90 to-transparent z-20 flex items-center justify-start pl-1 cursor-pointer"
+                        >
+                            <motion.div
+                                animate={{ x: [0, -5, 0] }}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            >
+                                <ChevronLeft className="text-white/60 w-5 h-5 drop-shadow-md" />
+                            </motion.div>
+                        </div>
+
+                        <div ref={scrollRef} className="px-5 flex gap-2 overflow-x-auto pb-2 relative z-10" style={{ scrollbarWidth: 'none' }}>
+                            {[
+                                { id: 'gender', label: 'Personagem', emoji: '👦' },
+                                { id: 'hair', label: 'Cabelo', emoji: '💇' },
+                                { id: 'shirt', label: 'Superior', emoji: '👕' },
+                                { id: 'pants', label: 'Inferior', emoji: '👖' },
+                                { id: 'footwear', label: 'Calçados', emoji: '👟' },
+                                { id: 'headwear', label: 'Acessórios', emoji: '🧢' },
+                            ].map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id as any)}
+                                    className="flex flex-col items-center justify-center p-3 rounded-2xl min-w-[80px] transition-all bg-white/5 whitespace-nowrap"
+                                    style={{
+                                        border: `1px solid ${activeTab === t.id ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)'}`,
+                                        background: activeTab === t.id ? 'rgba(168,85,247,0.1)' : 'var(--color-glass)',
+                                    }}>
+                                    <span className="text-xl mb-1">{t.emoji}</span>
+                                    <span className="text-[10px] uppercase tracking-wider font-bold"
+                                        style={{ color: activeTab === t.id ? 'var(--color-primary-light)' : 'var(--color-text-muted)' }}>
+                                        {t.label}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Right gradient/arrow indicator for scrolling forward */}
+                        <div
+                            onClick={() => scrollTabs('right')}
+                            className="absolute right-0 top-0 bottom-2 w-16 bg-gradient-to-l from-[#111]/90 to-transparent z-20 flex items-center justify-end pr-1 cursor-pointer"
+                        >
+                            <motion.div
+                                animate={{ x: [0, 5, 0] }}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            >
+                                <ChevronRight className="text-white/60 w-5 h-5 drop-shadow-md" />
+                            </motion.div>
+                        </div>
                     </div>
 
                     {/* Content Area (Scrollable grid based on active tab) */}
@@ -191,22 +249,22 @@ export default function AvatarPage() {
                                 className="grid grid-cols-2 lg:grid-cols-3 gap-3"
                             >
                                 {activeTab === 'gender' && GENDER_OPTIONS.map(g => (
-                                    <EmojiOption key={g.id} id={g.id} emoji={g.emoji} label={g.label} active={draft.gender === g.id}
+                                    <ItemOption key={g.id} id={g.id} image={(g as any).image} emoji={(g as any).emoji} label={g.label} active={draft.gender === g.id}
                                         disabled={!g.available} onClick={() => g.available && set('gender', 'man')} />
                                 ))}
 
                                 {activeTab === 'shirt' && SHIRT_OPTIONS.map(s => (
-                                    <ColorSwatch key={s.id} id={s.id} color={s.color} label={s.label} active={draft.shirt === s.id}
+                                    <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={draft.shirt === s.id}
                                         onClick={() => set('shirt', s.id)} />
                                 ))}
 
                                 {activeTab === 'pants' && PANTS_OPTIONS.map(p => (
-                                    <ColorSwatch key={p.id} id={p.id} color={p.color} label={p.label} active={draft.pants === p.id}
+                                    <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={draft.pants === p.id}
                                         onClick={() => set('pants', p.id)} />
                                 ))}
 
                                 {activeTab === 'footwear' && FOOTWEAR_OPTIONS.map(f => (
-                                    <EmojiOption key={f.id} id={f.id} emoji={f.emoji} label={f.label} active={draft.footwear === f.id}
+                                    <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={draft.footwear === f.id}
                                         onClick={() => set('footwear', f.id)} />
                                 ))}
 
@@ -215,7 +273,7 @@ export default function AvatarPage() {
                                     const isUnlocked = h.id === 'none' || (draft.unlocked_items || []).includes(h.id);
                                     if (!isUnlocked) return null;
                                     return (
-                                        <EmojiOption key={h.id} id={h.id} emoji={h.emoji} label={h.label} active={draft.headwear === h.id}
+                                        <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={draft.headwear === h.id}
                                             onClick={() => set('headwear', h.id)} />
                                     );
                                 })}

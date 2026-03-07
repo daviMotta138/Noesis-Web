@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, X, Gift, Loader2, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -55,6 +56,7 @@ const SHOP_SECTIONS = [
 ];
 
 export default function ShopPage() {
+    const navigate = useNavigate();
     const { profile, user, fetchProfile } = useGameStore();
     const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
     const [purchasing, setPurchasing] = useState(false);
@@ -263,49 +265,56 @@ export default function ShopPage() {
 
                         {/* Horizontal Scroll Area */}
                         <div className="flex overflow-x-auto px-5 gap-4 pb-4 snap-x" style={{ scrollbarWidth: 'none' }}>
-                            {section.items.map((item) => (
-                                <motion.button
-                                    key={item.id}
-                                    whileHover={{ scale: item.comingSoon ? 1 : 1.02 }}
-                                    whileTap={{ scale: item.comingSoon ? 1 : 0.98 }}
-                                    onClick={() => !item.comingSoon && setSelectedItem(item)}
-                                    className="relative flex-shrink-0 w-36 h-56 rounded-2xl flex flex-col snap-start overflow-hidden text-left"
-                                    style={{
-                                        background: item.comingSoon ? '#1A1D30' : item.bgStyle,
-                                        border: `2px solid ${item.comingSoon ? '#333' : item.borderStyle}`,
-                                        opacity: item.comingSoon ? 0.6 : 1,
-                                        boxShadow: item.comingSoon ? 'none' : `0 4px 20px ${item.borderStyle}40`
-                                    }}
-                                >
-                                    {/* Item Rarity Glow equivalent */}
-                                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                            {section.items.map((item) => {
+                                // Check if user already owns the cosmetic item
+                                const isOwned = item.category !== 'shield' && item.category !== 'item' && item.category !== 'pet' && ((profile?.avatar_config as any)?.unlocked_items as string[] || []).includes(item.id);
 
-                                    <div className="flex-1 flex items-center justify-center text-6xl drop-shadow-2xl z-10" style={{ filter: item.comingSoon ? 'grayscale(100%)' : 'none' }}>
-                                        {item.category === 'shield' ? (
-                                            <img src={shieldImg} className="w-24 h-24 object-contain" alt="" />
-                                        ) : item.image ? (
-                                            <img src={item.image} className="w-24 h-24 object-contain" alt={item.name} />
-                                        ) : item.emoji}
-                                    </div>
+                                return (
+                                    <motion.button
+                                        key={item.id}
+                                        whileHover={{ scale: item.comingSoon ? 1 : 1.02 }}
+                                        whileTap={{ scale: item.comingSoon ? 1 : 0.98 }}
+                                        onClick={() => !item.comingSoon && setSelectedItem(item)}
+                                        className="relative flex-shrink-0 w-36 h-56 rounded-2xl flex flex-col snap-start overflow-hidden text-left"
+                                        style={{
+                                            background: item.comingSoon ? '#1A1D30' : item.bgStyle,
+                                            border: `2px solid ${item.comingSoon ? '#333' : item.borderStyle}`,
+                                            opacity: item.comingSoon ? 0.6 : 1,
+                                            boxShadow: item.comingSoon ? 'none' : `0 4px 20px ${item.borderStyle}40`
+                                        }}
+                                    >
+                                        {/* Item Rarity Glow equivalent */}
+                                        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
 
-                                    <div className="p-3 z-10">
-                                        <p className="font-black text-sm text-white leading-tight uppercase italic">{item.name}</p>
-                                        <div className="flex items-center gap-1 mt-1">
-                                            {item.comingSoon ? (
-                                                <span className="text-[10px] font-bold text-gray-400 bg-black/40 px-2 py-0.5 rounded-sm uppercase tracking-wider">Em Breve</span>
-                                            ) : (
-                                                <>
-                                                    <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
-                                                    <span className="text-xs font-black text-white">{item.price}</span>
-                                                </>
-                                            )}
+                                        <div className="flex-1 flex items-center justify-center text-6xl drop-shadow-2xl z-10" style={{ filter: item.comingSoon ? 'grayscale(100%)' : 'none' }}>
+                                            {item.category === 'shield' ? (
+                                                <img src={shieldImg} className="w-24 h-24 object-contain" alt="" />
+                                            ) : item.image ? (
+                                                <img src={item.image} className="w-24 h-24 object-contain" alt={item.name} />
+                                            ) : item.emoji}
                                         </div>
-                                    </div>
 
-                                    {/* Glossy overlay */}
-                                    <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
-                                </motion.button>
-                            ))}
+                                        <div className="p-3 z-10">
+                                            <p className="font-black text-sm text-white leading-tight uppercase italic">{item.name}</p>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                {item.comingSoon ? (
+                                                    <span className="text-[10px] font-bold text-gray-400 bg-black/40 px-2 py-0.5 rounded-sm uppercase tracking-wider">Em Breve</span>
+                                                ) : isOwned ? (
+                                                    <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">Adquirido</span>
+                                                ) : (
+                                                    <>
+                                                        <img src={coinImg} className="w-3 h-3 object-contain" alt="" />
+                                                        <span className="text-xs font-black text-white">{item.price}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Glossy overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
+                                    </motion.button>
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
@@ -313,158 +322,178 @@ export default function ShopPage() {
 
             {/* Item Focus Modal (Fortnite Style Purchase Screen) */}
             <AnimatePresence>
-                {selectedItem && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] flex flex-col justify-end md:justify-center items-center p-4 bg-[var(--color-modal-overlay)] backdrop-blur-sm"
-                        onClick={() => { setSelectedItem(null); setIsGifting(false); }}
-                    >
-                        <button onClick={() => { setSelectedItem(null); setIsGifting(false); }} className="absolute top-6 right-6 p-2 rounded-full pointer-events-auto z-10" style={{ background: 'var(--color-glass-strong)', color: 'var(--color-text)' }}>
-                            <X size={24} />
-                        </button>
-
+                {selectedItem && (() => {
+                    const isItemSelectedOwned = selectedItem.category !== 'shield' && selectedItem.category !== 'item' && selectedItem.category !== 'pet' && ((profile?.avatar_config as any)?.unlocked_items as string[] || []).includes(selectedItem.id);
+                    return (
                         <motion.div
-                            initial={{ y: 100, scale: 0.9 }}
-                            animate={{ y: 0, scale: 1 }}
-                            exit={{ y: 100, scale: 0.9 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full max-w-sm rounded-[2rem] overflow-hidden"
-                            style={{
-                                background: 'var(--color-card)',
-                                border: `2px solid ${selectedItem.borderStyle}`,
-                                boxShadow: `0 0 60px ${selectedItem.borderStyle}30`
-                            }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] flex flex-col justify-end md:justify-center items-center p-4 bg-[var(--color-modal-overlay)] backdrop-blur-sm"
+                            onClick={() => { setSelectedItem(null); setIsGifting(false); }}
                         >
-                            {/* Showcase Image Area */}
-                            <div className="h-48 relative flex items-center justify-center border-b border-[var(--color-border)]" style={{ background: selectedItem.bgStyle }}>
-                                <div className="text-8xl drop-shadow-2xl">
-                                    {selectedItem.category === 'shield' ? (
-                                        <img src={shieldImg} className="w-28 h-28 object-contain animate-pulse" alt="" />
-                                    ) : selectedItem.image ? (
-                                        <img src={selectedItem.image} className="w-32 h-32 object-contain" alt={selectedItem.name} />
-                                    ) : selectedItem.emoji}
-                                </div>
-                                <div className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ background: 'var(--color-overlay)', color: '#fff' }}>
-                                    <ShoppingBag size={10} /> {selectedItem.category}
-                                </div>
-                            </div>
+                            <button onClick={() => { setSelectedItem(null); setIsGifting(false); }} className="absolute top-6 right-6 p-2 rounded-full pointer-events-auto z-10" style={{ background: 'var(--color-glass-strong)', color: 'var(--color-text)' }}>
+                                <X size={24} />
+                            </button>
 
-                            <div className="p-6">
-                                <h2 className="text-3xl font-black uppercase italic leading-none mb-1" style={{ color: 'var(--color-text)' }}>{selectedItem.name}</h2>
-                                <p className="text-xs mb-4" style={{ color: 'var(--color-text-sub)' }}>{selectedItem.desc}</p>
-
-                                {/* Quantity Selector for Single Shield */}
-                                {selectedItem.id === 'shield_1' && !isGifting && (
-                                    <div className="mb-4 flex items-center justify-between bg-[var(--color-glass)] p-3 rounded-xl border border-[var(--color-border)]">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-sub)]">Quantidade</p>
-                                        <div className="flex items-center gap-4">
-                                            <button
-                                                onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
-                                                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg hover:bg-white/10"
-                                                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                                            >-</button>
-                                            <span className="text-xl font-black min-w-[1.5rem] text-center" style={{ color: 'var(--color-text)' }}>{quantity}</span>
-                                            <button
-                                                onClick={() => setQuantity(prev => Math.min(10, prev + 1))}
-                                                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg hover:bg-white/10"
-                                                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
-                                            >+</button>
-                                        </div>
+                            <motion.div
+                                initial={{ y: 100, scale: 0.9 }}
+                                animate={{ y: 0, scale: 1 }}
+                                exit={{ y: 100, scale: 0.9 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full max-w-sm rounded-[2rem] overflow-hidden"
+                                style={{
+                                    background: 'var(--color-card)',
+                                    border: `2px solid ${selectedItem.borderStyle}`,
+                                    boxShadow: `0 0 60px ${selectedItem.borderStyle}30`
+                                }}
+                            >
+                                {/* Showcase Image Area */}
+                                <div className="h-48 relative flex items-center justify-center border-b border-[var(--color-border)]" style={{ background: selectedItem.bgStyle }}>
+                                    <div className="text-8xl drop-shadow-2xl">
+                                        {selectedItem.category === 'shield' ? (
+                                            <img src={shieldImg} className="w-28 h-28 object-contain animate-pulse" alt="" />
+                                        ) : selectedItem.image ? (
+                                            <img src={selectedItem.image} className="w-32 h-32 object-contain" alt={selectedItem.name} />
+                                        ) : selectedItem.emoji}
                                     </div>
-                                )}
+                                    <div className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ background: 'var(--color-overlay)', color: '#fff' }}>
+                                        <ShoppingBag size={10} /> {selectedItem.category}
+                                    </div>
+                                </div>
 
-                                {isGifting ? (
-                                    <div className="mb-6 space-y-3">
-                                        <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
-                                            <Gift size={14} className="text-amber-400" /> Para quem?
-                                        </p>
-                                        {loadingFriends ? (
-                                            <p className="text-xs text-gray-400 p-2">Carregando amigos...</p>
-                                        ) : friends.length === 0 ? (
-                                            <p className="text-xs text-red-400 p-2 bg-red-500/10 rounded-xl border border-red-500/20">Você precisa ter amigos adicionados para presentear.</p>
-                                        ) : (
-                                            <div className="relative">
+                                <div className="p-6">
+                                    <h2 className="text-3xl font-black uppercase italic leading-none mb-1" style={{ color: 'var(--color-text)' }}>{selectedItem.name}</h2>
+                                    <p className="text-xs mb-4" style={{ color: 'var(--color-text-sub)' }}>{selectedItem.desc}</p>
+
+                                    {/* Quantity Selector for Single Shield */}
+                                    {selectedItem.id === 'shield_1' && !isGifting && (
+                                        <div className="mb-4 flex items-center justify-between bg-[var(--color-glass)] p-3 rounded-xl border border-[var(--color-border)]">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-sub)]">Quantidade</p>
+                                            <div className="flex items-center gap-4">
                                                 <button
-                                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                                    className="w-full rounded-xl px-4 py-4 font-mono text-sm focus:border-amber-400 transition-colors flex items-center justify-between shadow-inner"
-                                                    style={{ background: 'var(--color-glass)', color: 'var(--color-text)', border: '1px solid var(--color-border)', outline: isDropdownOpen ? '1px solid var(--color-gold)' : 'none' }}
-                                                >
-                                                    <span className={giftTargetId ? '' : 'opacity-50'}>
-                                                        {giftTargetId ? (
-                                                            <>
-                                                                <span className="font-bold">{friends.find(f => f.friendId === giftTargetId)?.name}</span>
-                                                                <span className="ml-2 opacity-50">({giftTargetId})</span>
-                                                            </>
-                                                        ) : 'Selecione um amigo'}
-                                                    </span>
-                                                    <ChevronDown size={16} className={`transition-transform duration-300 ${isDropdownOpen ? 'rotate-180 text-amber-400' : 'text-gray-500'}`} />
-                                                </button>
-
-                                                <AnimatePresence>
-                                                    {isDropdownOpen && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, y: -10, scaleY: 0.95 }}
-                                                            animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                                                            exit={{ opacity: 0, y: -10, scaleY: 0.95 }}
-                                                            transition={{ duration: 0.15 }}
-                                                            className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-20 origin-top flex flex-col max-h-48 overflow-y-auto custom-scrollbar"
-                                                            style={{
-                                                                background: '#1A1D30',
-                                                                border: '1px solid var(--color-border-glow)',
-                                                                boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
-                                                            }}
-                                                        >
-                                                            {friends.map((f, i) => (
-                                                                <button
-                                                                    key={f.id}
-                                                                    onClick={() => { setGiftTargetId(f.friendId); setIsDropdownOpen(false); }}
-                                                                    className="w-full text-left px-4 py-3 text-sm font-mono transition-colors flex items-center gap-2 hover:opacity-80"
-                                                                    style={{ color: 'var(--color-text)', borderBottom: i < friends.length - 1 ? '1px solid var(--color-glass)' : 'none' }}
-                                                                >
-                                                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] shrink-0" style={{ background: 'var(--color-glass-strong)' }}>
-                                                                        🧠
-                                                                    </div>
-                                                                    <div className="flex flex-col">
-                                                                        <span className="font-bold leading-tight">{f.name}</span>
-                                                                        <span className="text-[10px] opacity-50">ID: {f.friendId}</span>
-                                                                    </div>
-                                                                </button>
-                                                            ))}
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                    onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                                                    className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg hover:bg-white/10"
+                                                    style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                                                >-</button>
+                                                <span className="text-xl font-black min-w-[1.5rem] text-center" style={{ color: 'var(--color-text)' }}>{quantity}</span>
+                                                <button
+                                                    onClick={() => setQuantity(prev => Math.min(10, prev + 1))}
+                                                    className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-lg hover:bg-white/10"
+                                                    style={{ border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                                                >+</button>
                                             </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="mb-6 rounded-xl p-4 flex justify-between items-center" style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
-                                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-sub)' }}>Preço</p>
-                                        <p className="text-xl font-black text-yellow-400 flex items-center gap-2">
-                                            <img src={coinImg} className="w-6 h-6 object-contain" alt="" />
-                                            {selectedItem.id === 'shield_1' ? selectedItem.price * quantity : selectedItem.price}
-                                        </p>
-                                    </div>
-                                )}
+                                        </div>
+                                    )}
 
-                                <div className="space-y-3">
-                                    {(selectedItem.id === 'shield_1' ? selectedItem.price * quantity : selectedItem.price) > coins ? (
-                                        <div className="w-full py-4 rounded-xl text-center bg-red-500/20 text-red-400 font-bold uppercase tracking-widest text-sm border border-red-500/30">
-                                            Nous Insuficientes
+                                    {isGifting ? (
+                                        <div className="mb-6 space-y-3">
+                                            <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+                                                <Gift size={14} className="text-amber-400" /> Para quem?
+                                            </p>
+                                            {loadingFriends ? (
+                                                <p className="text-xs text-gray-400 p-2">Carregando amigos...</p>
+                                            ) : friends.length === 0 ? (
+                                                <p className="text-xs text-red-400 p-2 bg-red-500/10 rounded-xl border border-red-500/20">Você precisa ter amigos adicionados para presentear.</p>
+                                            ) : (
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                                        className="w-full rounded-xl px-4 py-4 font-mono text-sm focus:border-amber-400 transition-colors flex items-center justify-between shadow-inner"
+                                                        style={{ background: 'var(--color-glass)', color: 'var(--color-text)', border: '1px solid var(--color-border)', outline: isDropdownOpen ? '1px solid var(--color-gold)' : 'none' }}
+                                                    >
+                                                        <span className={giftTargetId ? '' : 'opacity-50'}>
+                                                            {giftTargetId ? (
+                                                                <>
+                                                                    <span className="font-bold">{friends.find(f => f.friendId === giftTargetId)?.name}</span>
+                                                                    <span className="ml-2 opacity-50">({giftTargetId})</span>
+                                                                </>
+                                                            ) : 'Selecione um amigo'}
+                                                        </span>
+                                                        <ChevronDown size={16} className={`transition-transform duration-300 ${isDropdownOpen ? 'rotate-180 text-amber-400' : 'text-gray-500'}`} />
+                                                    </button>
+
+                                                    <AnimatePresence>
+                                                        {isDropdownOpen && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, y: -10, scaleY: 0.95 }}
+                                                                animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                                                                exit={{ opacity: 0, y: -10, scaleY: 0.95 }}
+                                                                transition={{ duration: 0.15 }}
+                                                                className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-20 origin-top flex flex-col max-h-48 overflow-y-auto custom-scrollbar"
+                                                                style={{
+                                                                    background: '#1A1D30',
+                                                                    border: '1px solid var(--color-border-glow)',
+                                                                    boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                                                                }}
+                                                            >
+                                                                {friends.map((f, i) => (
+                                                                    <button
+                                                                        key={f.id}
+                                                                        onClick={() => { setGiftTargetId(f.friendId); setIsDropdownOpen(false); }}
+                                                                        className="w-full text-left px-4 py-3 text-sm font-mono transition-colors flex items-center gap-2 hover:opacity-80"
+                                                                        style={{ color: 'var(--color-text)', borderBottom: i < friends.length - 1 ? '1px solid var(--color-glass)' : 'none' }}
+                                                                    >
+                                                                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] shrink-0" style={{ background: 'var(--color-glass-strong)' }}>
+                                                                            🧠
+                                                                        </div>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-bold leading-tight">{f.name}</span>
+                                                                            <span className="text-[10px] opacity-50">ID: {f.friendId}</span>
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
-                                        <>
+                                        <div className="mb-6 rounded-xl p-4 flex justify-between items-center" style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
+                                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-sub)' }}>Preço</p>
+                                            <p className="text-xl font-black text-yellow-400 flex items-center gap-2">
+                                                <img src={coinImg} className="w-6 h-6 object-contain" alt="" />
+                                                {selectedItem.id === 'shield_1' ? selectedItem.price * quantity : selectedItem.price}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                        {isGifting ? (
                                             <button
                                                 onClick={handleTransaction}
                                                 disabled={purchasing}
                                                 className="w-full py-4 rounded-xl font-black uppercase italic tracking-widest text-sm transition-transform active:scale-95 flex items-center justify-center gap-2"
-                                                style={{ background: isGifting ? '#FF9900' : 'var(--color-gold)', color: '#000' }}
+                                                style={{ background: '#FF9900', color: '#000' }}
                                             >
-                                                {purchasing ? <Loader2 className="animate-spin" size={18} /> : (isGifting ? 'CONFIRMAR PRESENTE' : 'COMPRAR ITEM')}
+                                                {purchasing ? <Loader2 className="animate-spin" size={18} /> : 'CONFIRMAR PRESENTE'}
                                             </button>
+                                        ) : (
+                                            <>
+                                                {isItemSelectedOwned ? (
+                                                    <button
+                                                        onClick={() => navigate('/avatar')}
+                                                        className="w-full py-4 rounded-xl font-black uppercase italic tracking-widest text-sm transition-transform active:scale-95 flex items-center justify-center gap-2"
+                                                        style={{ background: 'var(--color-gold)', color: '#000' }}
+                                                    >
+                                                        PERSONALIZAR
+                                                    </button>
+                                                ) : (selectedItem.id === 'shield_1' ? selectedItem.price * quantity : selectedItem.price) > coins ? (
+                                                    <div className="w-full py-4 rounded-xl text-center bg-red-500/20 text-red-400 font-bold uppercase tracking-widest text-sm border border-red-500/30">
+                                                        Nous Insuficientes
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleTransaction}
+                                                        disabled={purchasing}
+                                                        className="w-full py-4 rounded-xl font-black uppercase italic tracking-widest text-sm transition-transform active:scale-95 flex items-center justify-center gap-2"
+                                                        style={{ background: 'var(--color-gold)', color: '#000' }}
+                                                    >
+                                                        {purchasing ? <Loader2 className="animate-spin" size={18} /> : 'COMPRAR ITEM'}
+                                                    </button>
+                                                )}
 
-                                            {!isGifting && (
                                                 <button
                                                     onClick={() => setIsGifting(true)}
                                                     className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-2"
@@ -472,14 +501,14 @@ export default function ShopPage() {
                                                 >
                                                     <Gift size={14} /> PRESENTEAR UM AMIGO
                                                 </button>
-                                            )}
-                                        </>
-                                    )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
+                    );
+                })()}
             </AnimatePresence>
 
             {/* Corner Notifications (Purchase & Gift) */}

@@ -45,6 +45,14 @@ function getLayers(cfg: AvatarConfig): string[] {
     const base = `/avatars/man/boy.png`;
     const layers = [base];
 
+    // Avatar (Base Layer) is already pushed
+
+    // "chinelo" footwear goes UNDER pants
+    const safeFootwear = VALID_FOOTWEAR.includes(cfg.footwear as string) ? cfg.footwear : DEFAULT_AVATAR_CONFIG.footwear;
+    if (safeFootwear === 'chinelo') {
+        layers.push(`/avatars/man/chinelo.png`);
+    }
+
     // Pants layer
     const safePants = VALID_PANTS.includes(cfg.pants) ? cfg.pants : DEFAULT_AVATAR_CONFIG.pants;
     if (safePants && safePants !== 'none') layers.push(`/avatars/man/${safePants}.png`);
@@ -53,10 +61,9 @@ function getLayers(cfg: AvatarConfig): string[] {
     const safeShirt = VALID_SHIRTS.includes(cfg.shirt) ? cfg.shirt : DEFAULT_AVATAR_CONFIG.shirt;
     if (safeShirt && safeShirt !== 'none') layers.push(`/avatars/man/${safeShirt}.png`);
 
-    // Footwear
-    const safeFootwear = VALID_FOOTWEAR.includes(cfg.footwear as string) ? cfg.footwear : DEFAULT_AVATAR_CONFIG.footwear;
-    if (safeFootwear && safeFootwear !== 'none') {
-        layers.push(`/avatars/man/${safeFootwear}.png`);
+    // "tenis" footwear goes OVER pants and shirts
+    if (safeFootwear === 'tenis') {
+        layers.push(`/avatars/man/tenis.png`);
     }
 
     // Headwear
