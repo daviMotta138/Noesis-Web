@@ -30,15 +30,15 @@ const HEADWEAR_OPTIONS = [
 const OUTFITS_OPTIONS = [
     {
         id: 'outfit-casual', label: 'Casual Básico', emoji: '👕',
-        items: { shirt: 'camisa-branca' as const, pants: 'calca-bege' as const, footwear: 'chinelo' as const, headwear: 'none' as const }
+        items: { shirt: 'camisa-branca' as const, pants: 'calca-bege' as const, footwear: 'chinelo' as const, headwear: 'none' as const, coat: 'none' as const, outfit: 'none' as const }
     },
     {
         id: 'outfit-skatista', label: 'Skatista', emoji: '🛹',
-        items: { shirt: 'camisa-preta' as const, pants: 'calca-preta' as const, footwear: 'tenis' as const, headwear: 'bone-azul' as const }
+        items: { shirt: 'camisa-preta' as const, pants: 'calca-preta' as const, footwear: 'tenis' as const, headwear: 'bone-azul' as const, coat: 'none' as const, outfit: 'none' as const }
     },
     {
         id: 'outfit-none', label: 'Desequipar Tudo', isNone: true,
-        items: { shirt: 'none' as const, pants: 'none' as const, footwear: 'none' as const, headwear: 'none' as const }
+        items: { shirt: 'none' as const, pants: 'none' as const, footwear: 'none' as const, headwear: 'none' as const, coat: 'none' as const, outfit: 'none' as const }
     }
 ];
 
