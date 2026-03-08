@@ -17,6 +17,7 @@ interface ShopItem {
     is_visible?: boolean;
     is_default?: boolean;
     disabled_categories?: string[];
+    variations?: any[];
 }
 
 export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
@@ -71,7 +72,8 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
             target_gender: item.target_gender || 'all',
             is_visible: item.is_visible !== false,
             is_default: item.is_default === true,
-            disabled_categories: item.disabled_categories || []
+            disabled_categories: item.disabled_categories || [],
+            variations: item.variations || []
         };
 
         if (editingItem && editingItem.id !== '') {
@@ -104,7 +106,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                 <button
                     onClick={() => {
                         setEditingItem({
-                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true, is_default: false, disabled_categories: []
+                            id: '', name: '', description: '', category: 'headwear', price_nous: 100, price_brl: null, asset_key: '', preview_url: '', rarity: 'comum', target_gender: 'all', is_visible: true, is_default: false, disabled_categories: [], variations: []
                         });
                         setIsModalOpen(true);
                     }}
@@ -196,7 +198,18 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
 
             const { data: publicData } = supabase.storage.from('shop_assets').getPublicUrl(data.path);
 
-            setDraft(prev => ({ ...prev, [field]: publicData.publicUrl }));
+            if (field.startsWith('var_preview_') || field.startsWith('var_asset_')) {
+                const [, type, idxStr] = field.split('_');
+                const idx = parseInt(idxStr);
+                const isPreview = type === 'preview';
+                const vars = [...(draft.variations || [])];
+                if (vars[idx]) {
+                    vars[idx] = { ...vars[idx], [isPreview ? 'preview_url' : 'asset_key']: publicData.publicUrl };
+                    setDraft(prev => ({ ...prev, variations: vars }));
+                }
+            } else {
+                setDraft(prev => ({ ...prev, [field]: publicData.publicUrl }));
+            }
             addLog(`Imagem enviada: ${fileName}`);
         } catch (err: any) {
             addLog(`Erro no upload: ${err.message}`);
@@ -281,7 +294,6 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 <option value="coat">Casacos (Jaqueta/Por cima)</option>
                                 <option value="pants">Vestuário Inferior (Calça)</option>
                                 <option value="shoes">Calçado (Tênis/Chinelo)</option>
-                                <option value="hair">Cabelo</option>
                                 <option value="headwear">Acessório de Cabeça (Boné/Chapéu)</option>
                                 <option value="accessory">Acessório de Rosto</option>
                                 <option value="effect">Efeito de Partículas (Aura)</option>
@@ -308,7 +320,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold w-full text-white/50 mb-1">Gênero Alvo</label>
+                            <label className="block text-xs font-bold w-full text-white/50 mb-1">Compatível com</label>
                             <select
                                 value={draft.target_gender || 'all'}
                                 onChange={e => setDraft({ ...draft, target_gender: e.target.value })}
@@ -364,7 +376,6 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                 { id: 'shoes', label: 'Calçados' },
                                 { id: 'headwear', label: 'A. Cabeça' },
                                 { id: 'accessory', label: 'A. Rosto' },
-                                { id: 'hair', label: 'Cabelo' },
                             ].map(cat => (
                                 <label key={cat.id} className="flex items-center gap-2 cursor-pointer">
                                     <input
@@ -457,10 +468,123 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                                     />
                                 </div>
                             </div>
-                            <p className="text-[10px] text-white/40 leading-tight">
-                                Para roupas, a imagem deve seguir o manequim padrão. No caso de 'Personagem', é a imagem base do corpo (transparent).
-                            </p>
                         </div>
+                    </div>
+
+                    <hr className="border-white/5 my-4" />
+
+                    {/* Variations Manager */}
+                    <div className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <div>
+                                <h3 className="text-sm font-bold text-white">Variações do Item (Cores, Estilos)</h3>
+                                <p className="text-[10px] text-white/50">Adicione variações opcionais que o jogador pode escolher ao vestir este item.</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newVars = [...(draft.variations || []), { id: `var_${Date.now()}`, label: 'Nova Cor', asset_key: '', preview_url: '' }];
+                                    setDraft({ ...draft, variations: newVars });
+                                }}
+                                className="px-3 py-1 bg-gold/10 text-gold hover:bg-gold/20 rounded text-xs font-bold flex items-center gap-1"
+                            >
+                                <Plus size={14} /> ADICIONAR VARIAÇÃO
+                            </button>
+                        </div>
+
+                        {(draft.variations || []).length > 0 ? (
+                            <div className="space-y-4">
+                                {(draft.variations || []).map((v: any, idx: number) => (
+                                    <div key={idx} className="bg-deep/50 p-3 rounded-lg border border-white/5 relative group">
+                                        <button
+                                            onClick={() => {
+                                                const newVars = [...(draft.variations || [])];
+                                                newVars.splice(idx, 1);
+                                                setDraft({ ...draft, variations: newVars });
+                                            }}
+                                            className="absolute top-2 right-2 p-1 text-red-400 hover:bg-red-500/10 rounded"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+
+                                        <div className="grid grid-cols-2 gap-3 mb-3 pr-8">
+                                            <div>
+                                                <label className="text-[10px] text-white/50 mb-1 block">ID da Variação (inglês, sem espaço)</label>
+                                                <input
+                                                    type="text"
+                                                    value={v.id}
+                                                    onChange={(e) => {
+                                                        const newVars = [...(draft.variations || [])];
+                                                        newVars[idx].id = e.target.value;
+                                                        setDraft({ ...draft, variations: newVars });
+                                                    }}
+                                                    className="field bg-black/50 text-xs py-1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-white/50 mb-1 block">Rótulo visível (ex: Azul, Verde)</label>
+                                                <input
+                                                    type="text"
+                                                    value={v.label}
+                                                    onChange={(e) => {
+                                                        const newVars = [...(draft.variations || [])];
+                                                        newVars[idx].label = e.target.value;
+                                                        setDraft({ ...draft, variations: newVars });
+                                                    }}
+                                                    className="field bg-black/50 text-xs py-1"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="flex gap-2">
+                                                <div className="w-10 h-10 bg-black/50 rounded flex items-center justify-center shrink-0">
+                                                    {v.preview_url ? <img src={v.preview_url} className="w-full h-full object-contain" /> : <ImageIcon size={14} className="text-white/20" />}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[9px] text-white/50 mb-1 block">Ícone (Preview)</label>
+                                                    <input
+                                                        type="file"
+                                                        id={`upload_vprev_${idx}`}
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => handleUpload(e, `var_preview_${idx}` as any)}
+                                                    />
+                                                    <label htmlFor={`upload_vprev_${idx}`} className="text-[9px] cursor-pointer bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded border border-white/10 inline-block mb-1">Upload</label>
+                                                    <input type="text" value={v.preview_url} onChange={(e) => {
+                                                        const newVars = [...(draft.variations || [])];
+                                                        newVars[idx].preview_url = e.target.value;
+                                                        setDraft({ ...draft, variations: newVars });
+                                                    }} className="w-full bg-black/50 border border-white/10 text-[9px] px-1 py-0.5 rounded" placeholder="URL" />
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <div className="w-10 h-10 bg-black/50 rounded flex items-center justify-center shrink-0">
+                                                    {v.asset_key ? <img src={v.asset_key} className="w-full h-full object-contain" /> : <ImageIcon size={14} className="text-white/20" />}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[9px] text-white/50 mb-1 block">Imagem no Boneco</label>
+                                                    <input
+                                                        type="file"
+                                                        id={`upload_vast_${idx}`}
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => handleUpload(e, `var_asset_${idx}` as any)}
+                                                    />
+                                                    <label htmlFor={`upload_vast_${idx}`} className="text-[9px] cursor-pointer bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded border border-white/10 inline-block mb-1">Upload</label>
+                                                    <input type="text" value={v.asset_key} onChange={(e) => {
+                                                        const newVars = [...(draft.variations || [])];
+                                                        newVars[idx].asset_key = e.target.value;
+                                                        setDraft({ ...draft, variations: newVars });
+                                                    }} className="w-full bg-black/50 border border-white/10 text-[9px] px-1 py-0.5 rounded" placeholder="URL" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-white/30 text-center py-2">Este item não possui variações além da principal.</p>
+                        )}
                     </div>
                 </div>
 

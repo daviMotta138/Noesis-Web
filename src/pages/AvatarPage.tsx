@@ -59,6 +59,7 @@ export default function AvatarPage() {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const [shopItems, setShopItems] = useState<any[]>([]);
+    const [showVariationsFor, setShowVariationsFor] = useState<any>(null);
 
     useEffect(() => {
         supabase.from('shop_items').select('*').then(({ data }) => {
@@ -71,11 +72,11 @@ export default function AvatarPage() {
         if (shopItems.length === 0) return;
 
         const newDraft = { ...draft };
-        const eqIds = [newDraft.shirt, newDraft.coat, newDraft.pants, newDraft.footwear, newDraft.headwear, newDraft.outfit].filter(i => i && i !== 'none');
+        const eqIds = [newDraft.shirt, newDraft.coat, newDraft.pants, newDraft.footwear, newDraft.headwear, newDraft.outfit].filter((i): i is string => typeof i === 'string' && i !== 'none');
 
         const disabledCats: string[] = [];
         eqIds.forEach(eqId => {
-            const def = shopItems.find(i => i.id === eqId || (i.asset_key && i.asset_key === eqId));
+            const def = shopItems.find(i => i.id === eqId || i.asset_key === eqId || (i.variations && i.variations.some((v: any) => v.asset_key === eqId)));
             if (def && def.disabled_categories) {
                 disabledCats.push(...def.disabled_categories);
             }
@@ -98,6 +99,14 @@ export default function AvatarPage() {
 
     const activeBaseGender = draft.base_gender || (draft.gender === 'woman' ? 'woman' : 'man');
 
+    const RARITY_ORDER: Record<string, number> = {
+        'lendario': 5,
+        'epico': 4,
+        'raro': 3,
+        'incomum': 2,
+        'comum': 1
+    };
+
     const getDynamicOptions = (cat: string) => {
         const unlocked = ((profile?.avatar_config as any)?.unlocked_items as string[]) || [];
 
@@ -108,10 +117,17 @@ export default function AvatarPage() {
                 const genderMatch = i.target_gender === 'all' || i.target_gender === activeBaseGender;
                 return isCat && isUnlocked && genderMatch;
             })
+            .sort((a, b) => {
+                const rA = RARITY_ORDER[a.rarity || 'comum'] || 0;
+                const rB = RARITY_ORDER[b.rarity || 'comum'] || 0;
+                return rB - rA; // Descending, highest rarity first
+            })
             .map(i => ({
                 id: i.asset_key || i.id,
                 label: i.name,
-                image: i.preview_url || i.asset_key || ''
+                image: i.preview_url || i.asset_key || '',
+                rarity: i.rarity || 'comum',
+                variations: i.variations || []
             }));
     };
 
@@ -138,11 +154,11 @@ export default function AvatarPage() {
         }
     };
 
-    const equippedItemIds = [draft.shirt, draft.coat, draft.pants, draft.footwear, draft.headwear, draft.outfit].filter(i => i && i !== 'none');
+    const equippedItemIds = [draft.shirt, draft.coat, draft.pants, draft.footwear, draft.headwear, draft.outfit].filter((i): i is string => typeof i === 'string' && i !== 'none');
 
     // Calculate which categories are disabled by the currently equipped items
     const disabledCategories = equippedItemIds.reduce((acc, eqId) => {
-        const itemDef = shopItems.find(i => i.id === eqId || (i.asset_key && i.asset_key === eqId));
+        const itemDef = shopItems.find(i => i.id === eqId || i.asset_key === eqId || (i.variations && i.variations.some((v: any) => v.asset_key === eqId)));
         if (itemDef && itemDef.disabled_categories) {
             itemDef.disabled_categories.forEach((cat: string) => {
                 if (!acc.includes(cat)) acc.push(cat);
@@ -156,8 +172,8 @@ export default function AvatarPage() {
             const newDraft = { ...draft, [key]: val };
 
             // Auto unequip items in newly disabled categories
-            if (val !== 'none') {
-                const itemDef = shopItems.find(i => i.id === val || (i.asset_key && i.asset_key === val));
+            if (val !== 'none' && typeof val === 'string') {
+                const itemDef = shopItems.find(i => i.id === val || i.asset_key === val || (i.variations && i.variations.some((v: any) => v.asset_key === val)));
                 if (itemDef && itemDef.disabled_categories) {
                     itemDef.disabled_categories.forEach((cat: string) => {
                         if (['shirt', 'coat', 'pants', 'shoes', 'footwear', 'headwear', 'outfits'].includes(cat)) {
@@ -209,41 +225,63 @@ export default function AvatarPage() {
     };
 
     // Sub-components for options to keep render clean
-    const ItemOption = ({ image, emoji, isNone, active, onClick, label, disabled = false, disabledReason }: any) => (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl relative transition-all"
-            style={{
-                background: active && !disabled ? 'rgba(168,85,247,0.15)' : 'var(--color-glass)',
-                border: active && !disabled ? '2px solid #A855F7' : '2px solid var(--color-border)',
-                opacity: disabled ? 0.45 : 1,
-                flex: '1 1 0px',
-                minHeight: '110px'
-            }}>
-            <div className="flex-1 flex items-center justify-center w-full h-12 relative pointer-events-none">
-                {isNone ? (
-                    <span className="text-3xl opacity-30 drop-shadow-md">✖️</span>
-                ) : image ? (
-                    <img src={image} className="w-full h-full object-contain drop-shadow-md" alt={label} />
-                ) : (
-                    <span className="text-3xl drop-shadow-md">{emoji}</span>
-                )}
-            </div>
-            <span className="text-xs font-bold truncate max-w-full px-1"
-                style={{ color: active && !disabled ? '#C084FC' : 'var(--color-text-sub)' }}>
-                {label}
-            </span>
-            {disabled && (
-                <div className="absolute inset-0 rounded-2xl bg-black/40 flex flex-col items-center justify-center gap-1 backdrop-blur-[1px]">
-                    <AlertCircle size={14} className="text-yellow-400" />
-                    <span className="text-[9px] uppercase tracking-wider font-black text-white/90 text-center px-2">
-                        {disabledReason || 'Em breve'}
-                    </span>
+    const ItemOption = ({ image, emoji, isNone, active, onClick, label, disabled = false, disabledReason, rarity, variations }: any) => {
+
+        const rarityColors: Record<string, string> = {
+            'lendario': '#FBBF24', // Dourado
+            'epico': '#A855F7',    // Roxo
+            'raro': '#3B82F6',     // Azul
+            'incomum': '#4ADE80',  // Verde
+            'comum': 'var(--color-border)',
+        };
+
+        const borderColor = active && !disabled ? '#A855F7' : (rarityColors[rarity] || rarityColors['comum']);
+        const glowColor = rarityColors[rarity] || 'transparent';
+
+        return (
+            <button
+                onClick={onClick}
+                disabled={disabled}
+                className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl relative transition-all"
+                style={{
+                    background: active && !disabled ? 'rgba(168,85,247,0.15)' : 'var(--color-glass)',
+                    border: `2px solid ${borderColor}`,
+                    boxShadow: rarity && rarity !== 'comum' ? `0 0 10px ${glowColor}40 inset, 0 4px 15px ${glowColor}30` : 'none',
+                    opacity: disabled ? 0.45 : 1,
+                    flex: '1 1 0px',
+                    minHeight: '110px'
+                }}>
+                <div className="flex-1 flex items-center justify-center w-full h-12 relative pointer-events-none">
+                    {isNone ? (
+                        <span className="text-3xl opacity-30 drop-shadow-md">✖️</span>
+                    ) : image ? (
+                        <img src={image} className="w-full h-full object-contain drop-shadow-md" alt={label} />
+                    ) : (
+                        <span className="text-3xl drop-shadow-md">{emoji}</span>
+                    )}
                 </div>
-            )}
-        </button>
-    );
+                <span className="text-xs font-bold truncate max-w-full px-1"
+                    style={{ color: active && !disabled ? '#C084FC' : (rarity && rarity !== 'comum' ? rarityColors[rarity] : 'var(--color-text-sub)') }}>
+                    {label}
+                </span>
+
+                {variations && variations.length > 0 && (
+                    <div className="absolute top-1 right-1 bg-white/10 backdrop-blur-sm rounded-full px-1.5 py-0.5 text-[8px] font-black text-white/80 border border-white/20">
+                        +{variations.length}
+                    </div>
+                )}
+
+                {disabled && (
+                    <div className="absolute inset-0 rounded-2xl bg-black/40 flex flex-col items-center justify-center gap-1 backdrop-blur-[1px]">
+                        <AlertCircle size={14} className="text-yellow-400" />
+                        <span className="text-[9px] uppercase tracking-wider font-black text-white/90 text-center px-2">
+                            {disabledReason || 'Em breve'}
+                        </span>
+                    </div>
+                )}
+            </button>
+        );
+    };
 
     return (
         <div className="fixed inset-0 z-[999] bg-[#0A0A10] flex flex-col md:flex-row overflow-hidden text-white font-body">
@@ -339,7 +377,6 @@ export default function AvatarPage() {
                             {[
                                 { id: 'outfits', label: 'Conjuntos', emoji: '🛍️', disabledKey: 'outfits' },
                                 { id: 'gender', label: 'Personagem', emoji: '👦' },
-                                { id: 'hair', label: 'Cabelo', emoji: '💇', disabledKey: 'hair' },
                                 { id: 'shirt', label: 'Superior', emoji: '👕', disabledKey: 'shirt' },
                                 { id: 'coat', label: 'Casacos', emoji: '🧥', disabledKey: 'coat' },
                                 { id: 'pants', label: 'Inferior', emoji: '👖', disabledKey: 'pants' },
@@ -419,35 +456,75 @@ export default function AvatarPage() {
                                         disabled={!g.available} onClick={() => handleGenderChange(g)} />
                                 ))}
 
-                                {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shirt')].map(s => (
-                                    <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={draft.shirt === s.id}
-                                        disabled={disabledCategories.includes('shirt') && s.id !== 'none'} disabledReason="Bloqueado"
-                                        onClick={() => set('shirt', s.id)} />
-                                ))}
+                                {activeTab === 'shirt' && [...SHIRT_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shirt')].map(s => {
+                                    const isActive = draft.shirt === s.id || ((s as any).variations && (s as any).variations.some((v: any) => v.asset_key === draft.shirt));
+                                    return (
+                                        <ItemOption key={s.id} id={s.id} image={(s as any).image} isNone={(s as any).isNone} label={s.label} active={isActive}
+                                            disabled={disabledCategories.includes('shirt') && s.id !== 'none'} disabledReason="Bloqueado"
+                                            rarity={(s as any).rarity} variations={(s as any).variations}
+                                            onClick={() => {
+                                                set('shirt', s.id);
+                                                if ((s as any).variations && (s as any).variations.length > 0) setShowVariationsFor({ item: s, category: 'shirt' });
+                                                else setShowVariationsFor(null);
+                                            }} />
+                                    );
+                                })}
 
-                                {activeTab === 'coat' && [{ id: 'none', label: 'Sem Casaco', isNone: true }, ...getDynamicOptions('coat')].map(c => (
-                                    <ItemOption key={c.id} id={c.id} image={(c as any).image} isNone={(c as any).isNone} label={c.label} active={draft.coat === c.id || (!draft.coat && c.id === 'none')}
-                                        disabled={disabledCategories.includes('coat') && c.id !== 'none'} disabledReason="Bloqueado"
-                                        onClick={() => set('coat', c.id)} />
-                                ))}
+                                {activeTab === 'coat' && [{ id: 'none', label: 'Sem Casaco', isNone: true }, ...getDynamicOptions('coat')].map(c => {
+                                    const isActive = draft.coat === c.id || (!draft.coat && c.id === 'none') || ((c as any).variations && (c as any).variations.some((v: any) => v.asset_key === draft.coat));
+                                    return (
+                                        <ItemOption key={c.id} id={c.id} image={(c as any).image} isNone={(c as any).isNone} label={c.label} active={isActive}
+                                            disabled={disabledCategories.includes('coat') && c.id !== 'none'} disabledReason="Bloqueado"
+                                            rarity={(c as any).rarity} variations={(c as any).variations}
+                                            onClick={() => {
+                                                set('coat', c.id);
+                                                if ((c as any).variations && (c as any).variations.length > 0) setShowVariationsFor({ item: c, category: 'coat' });
+                                                else setShowVariationsFor(null);
+                                            }} />
+                                    );
+                                })}
 
-                                {activeTab === 'pants' && [...PANTS_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('pants')].map(p => (
-                                    <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={draft.pants === p.id}
-                                        disabled={disabledCategories.includes('pants') && p.id !== 'none'} disabledReason="Bloqueado"
-                                        onClick={() => set('pants', p.id)} />
-                                ))}
+                                {activeTab === 'pants' && [...PANTS_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('pants')].map(p => {
+                                    const isActive = draft.pants === p.id || ((p as any).variations && (p as any).variations.some((v: any) => v.asset_key === draft.pants));
+                                    return (
+                                        <ItemOption key={p.id} id={p.id} image={(p as any).image} isNone={(p as any).isNone} label={p.label} active={isActive}
+                                            disabled={disabledCategories.includes('pants') && p.id !== 'none'} disabledReason="Bloqueado"
+                                            rarity={(p as any).rarity} variations={(p as any).variations}
+                                            onClick={() => {
+                                                set('pants', p.id);
+                                                if ((p as any).variations && (p as any).variations.length > 0) setShowVariationsFor({ item: p, category: 'pants' });
+                                                else setShowVariationsFor(null);
+                                            }} />
+                                    );
+                                })}
 
-                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shoes')].map(f => (
-                                    <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={draft.footwear === f.id}
-                                        disabled={(disabledCategories.includes('shoes') || disabledCategories.includes('footwear')) && f.id !== 'none'} disabledReason="Bloqueado"
-                                        onClick={() => set('footwear', f.id)} />
-                                ))}
+                                {activeTab === 'footwear' && [...FOOTWEAR_OPTIONS.filter(o => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('shoes')].map(f => {
+                                    const isActive = draft.footwear === f.id || ((f as any).variations && (f as any).variations.some((v: any) => v.asset_key === draft.footwear));
+                                    return (
+                                        <ItemOption key={f.id} id={f.id} image={(f as any).image} isNone={(f as any).isNone} label={f.label} active={isActive}
+                                            disabled={(disabledCategories.includes('shoes') || disabledCategories.includes('footwear')) && f.id !== 'none'} disabledReason="Bloqueado"
+                                            rarity={(f as any).rarity} variations={(f as any).variations}
+                                            onClick={() => {
+                                                set('footwear', f.id);
+                                                if ((f as any).variations && (f as any).variations.length > 0) setShowVariationsFor({ item: f, category: 'footwear' });
+                                                else setShowVariationsFor(null);
+                                            }} />
+                                    );
+                                })}
 
-                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('headwear')].map(h => (
-                                    <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={draft.headwear === h.id}
-                                        disabled={disabledCategories.includes('headwear') && h.id !== 'none'} disabledReason="Bloqueado por outro item"
-                                        onClick={() => set('headwear', h.id)} />
-                                ))}
+                                {activeTab === 'headwear' && [...HEADWEAR_OPTIONS.filter((o: any) => !o.gender || o.gender === activeBaseGender), ...getDynamicOptions('headwear')].map(h => {
+                                    const isActive = draft.headwear === h.id || ((h as any).variations && (h as any).variations.some((v: any) => v.asset_key === draft.headwear));
+                                    return (
+                                        <ItemOption key={h.id} id={h.id} image={(h as any).image} isNone={(h as any).isNone} label={h.label} active={isActive}
+                                            disabled={disabledCategories.includes('headwear') && h.id !== 'none'} disabledReason="Bloqueado por outro item"
+                                            rarity={(h as any).rarity} variations={(h as any).variations}
+                                            onClick={() => {
+                                                set('headwear', h.id);
+                                                if ((h as any).variations && (h as any).variations.length > 0) setShowVariationsFor({ item: h, category: 'headwear' });
+                                                else setShowVariationsFor(null);
+                                            }} />
+                                    );
+                                })}
 
                                 {activeTab === 'headwear' && (draft.unlocked_items || []).length === 0 && (
                                     <div className="col-span-2 lg:col-span-3 text-center py-8 opacity-50">
@@ -461,22 +538,51 @@ export default function AvatarPage() {
                 </div>
 
                 {/* Footer Save Button sticky at bottom */}
-                <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/90 to-transparent">
+                <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex gap-3">
+
+                    {showVariationsFor && (
+                        <div className="flex-1 overflow-x-auto flex gap-2 items-center p-2 bg-white/5 rounded-2xl border border-white/10" style={{ scrollbarWidth: 'none' }}>
+                            <div className="text-[10px] font-black uppercase text-white/50 px-2 leading-tight">
+                                Variações<br />Disponíveis
+                            </div>
+                            <button
+                                onClick={() => set(showVariationsFor.category, showVariationsFor.item.id)}
+                                className={`w-12 h-12 shrink-0 rounded-xl relative overflow-hidden transition-all ${draft[showVariationsFor.category as keyof AvatarConfig] === showVariationsFor.item.id ? 'border-2 border-primary shadow-[0_0_15px_#A855F7] bg-primary/20' : 'border border-white/20 bg-black/50'}`}
+                            >
+                                <img src={showVariationsFor.item.image} className="w-full h-full object-contain" />
+                            </button>
+                            {showVariationsFor.item.variations.map((v: any) => (
+                                <button
+                                    key={v.id}
+                                    onClick={() => set(showVariationsFor.category, v.asset_key as any)}
+                                    className={`w-12 h-12 shrink-0 rounded-xl relative overflow-hidden transition-all ${draft[showVariationsFor.category as keyof AvatarConfig] === v.asset_key ? 'border-2 border-primary shadow-[0_0_15px_#A855F7] bg-primary/20' : 'border border-white/20 bg-black/50 hover:bg-white/10'}`}
+                                >
+                                    {v.preview_url ? (
+                                        <img src={v.preview_url} className="w-full h-full object-contain" />
+                                    ) : (
+                                        <div className="w-full h-full bg-white/20" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="w-full py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                        className="flex-1 py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                         style={{
                             background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
                             boxShadow: '0 8px 30px rgba(168,85,247,0.4)',
-                            opacity: saving ? 0.7 : 1
+                            opacity: saving ? 0.7 : 1,
+                            minWidth: showVariationsFor ? '160px' : 'auto'
                         }}>
                         {saving ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
                             <>
                                 <Check size={18} />
-                                Equipar Avatar
+                                Equipar
                             </>
                         )}
                     </button>
