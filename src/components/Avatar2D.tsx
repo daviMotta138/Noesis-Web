@@ -10,6 +10,7 @@ export interface AvatarConfig {
     footwear: string;
     headwear?: string;
     coat?: string;
+    outfit?: string;
     unlocked_items?: string[];
 }
 
@@ -20,6 +21,7 @@ export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
     footwear: 'chinelo',
     headwear: 'none',
     coat: 'none',
+    outfit: 'none',
 };
 
 const VALID_PANTS = ['calca-bege', 'calca-preta', 'none'];
@@ -82,6 +84,11 @@ function getLayers(cfg: AvatarConfig): string[] {
     // "tenis" and other footwear goes OVER pants and shirts/coats
     if (footerPath && footerPath !== 'none' && footerPath !== 'chinelo' && !footerPath.includes('chinelo')) {
         layers.push((footerPath.startsWith('http') || footerPath.startsWith('/')) ? footerPath : `/avatars/${genderFolder}/${footerPath}.png`);
+    }
+
+    // Outfit (Conjunto) layer goes OVER almost everything except perhaps headwear depending on style
+    if (cfg.outfit && cfg.outfit !== 'none') {
+        layers.push((cfg.outfit.startsWith('http') || cfg.outfit.startsWith('/')) ? cfg.outfit : `/avatars/${genderFolder}/${cfg.outfit}.png`);
     }
 
     // Headwear

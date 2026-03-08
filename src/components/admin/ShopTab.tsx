@@ -356,6 +356,7 @@ function ItemModal({ item, onClose, onSave, addLog }: { item: ShopItem, onClose:
                         </div>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                             {[
+                                { id: 'outfits', label: 'Conjuntos' },
                                 { id: 'shirt', label: 'Camisa' },
                                 { id: 'coat', label: 'Casacos' },
                                 { id: 'pants', label: 'Calças' },

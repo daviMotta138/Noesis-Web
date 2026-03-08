@@ -71,7 +71,7 @@ export default function AvatarPage() {
         if (shopItems.length === 0) return;
 
         const newDraft = { ...draft };
-        const eqIds = [newDraft.shirt, newDraft.coat, newDraft.pants, newDraft.footwear, newDraft.headwear].filter(i => i && i !== 'none');
+        const eqIds = [newDraft.shirt, newDraft.coat, newDraft.pants, newDraft.footwear, newDraft.headwear, newDraft.outfit].filter(i => i && i !== 'none');
 
         const disabledCats: string[] = [];
         eqIds.forEach(eqId => {
@@ -87,6 +87,7 @@ export default function AvatarPage() {
         if (disabledCats.includes('pants') && newDraft.pants !== 'none') { newDraft.pants = 'none'; needsUpdate = true; }
         if ((disabledCats.includes('shoes') || disabledCats.includes('footwear')) && newDraft.footwear !== 'none') { newDraft.footwear = 'none'; needsUpdate = true; }
         if (disabledCats.includes('headwear') && newDraft.headwear !== 'none') { newDraft.headwear = 'none'; needsUpdate = true; }
+        if (disabledCats.includes('outfits') && newDraft.outfit !== 'none') { newDraft.outfit = 'none'; needsUpdate = true; }
 
         if (needsUpdate) {
             setDraft(newDraft);
@@ -137,7 +138,7 @@ export default function AvatarPage() {
         }
     };
 
-    const equippedItemIds = [draft.shirt, draft.coat, draft.pants, draft.footwear, draft.headwear].filter(i => i && i !== 'none');
+    const equippedItemIds = [draft.shirt, draft.coat, draft.pants, draft.footwear, draft.headwear, draft.outfit].filter(i => i && i !== 'none');
 
     // Calculate which categories are disabled by the currently equipped items
     const disabledCategories = equippedItemIds.reduce((acc, eqId) => {
@@ -159,9 +160,9 @@ export default function AvatarPage() {
                 const itemDef = shopItems.find(i => i.id === val);
                 if (itemDef && itemDef.disabled_categories) {
                     itemDef.disabled_categories.forEach((cat: string) => {
-                        if (['shirt', 'coat', 'pants', 'shoes', 'footwear', 'headwear'].includes(cat)) {
+                        if (['shirt', 'coat', 'pants', 'shoes', 'footwear', 'headwear', 'outfits'].includes(cat)) {
                             // map "shoes" back to "footwear" state property if needed, though state is footwear
-                            const stateKey = cat === 'shoes' ? 'footwear' : cat;
+                            const stateKey = cat === 'shoes' ? 'footwear' : (cat === 'outfits' ? 'outfit' : cat);
                             (newDraft as any)[stateKey] = 'none';
                         }
                     });
@@ -187,7 +188,7 @@ export default function AvatarPage() {
         };
 
         // Unequip items forcefully on character switch as requested by user
-        ['shirt', 'pants', 'coat', 'footwear', 'headwear'].forEach(slot => {
+        ['shirt', 'pants', 'coat', 'footwear', 'headwear', 'outfit'].forEach(slot => {
             newConfig[slot] = 'none';
         });
 
@@ -336,7 +337,7 @@ export default function AvatarPage() {
 
                         <div ref={scrollRef} className="px-5 flex gap-2 overflow-x-auto pb-2 relative z-10" style={{ scrollbarWidth: 'none' }}>
                             {[
-                                { id: 'outfits', label: 'Conjuntos', emoji: '🛍️' },
+                                { id: 'outfits', label: 'Conjuntos', emoji: '🛍️', disabledKey: 'outfits' },
                                 { id: 'gender', label: 'Personagem', emoji: '👦' },
                                 { id: 'hair', label: 'Cabelo', emoji: '💇', disabledKey: 'hair' },
                                 { id: 'shirt', label: 'Superior', emoji: '👕', disabledKey: 'shirt' },
@@ -395,13 +396,23 @@ export default function AvatarPage() {
                                 transition={{ duration: 0.2 }}
                                 className="grid grid-cols-2 lg:grid-cols-3 gap-3"
                             >
-                                {activeTab === 'outfits' && OUTFITS_OPTIONS.map(o => (
-                                    <ItemOption key={o.id} id={o.id} emoji={(o as any).emoji} isNone={(o as any).isNone} label={o.label} active={false}
-                                        onClick={() => {
-                                            setDraft(prev => ({ ...prev, ...o.items }));
-                                            setFlashKey(prev => prev + 1);
-                                        }} />
-                                ))}
+                                {activeTab === 'outfits' && (
+                                    <>
+                                        {OUTFITS_OPTIONS.map(o => (
+                                            <ItemOption key={o.id} id={o.id} emoji={(o as any).emoji} isNone={(o as any).isNone} label={o.label} active={false}
+                                                disabled={disabledCategories.includes('outfits') && !o.isNone} disabledReason="Bloqueado"
+                                                onClick={() => {
+                                                    setDraft(prev => ({ ...prev, ...o.items }));
+                                                    setFlashKey(prev => prev + 1);
+                                                }} />
+                                        ))}
+                                        {getDynamicOptions('outfits').map((o: any) => (
+                                            <ItemOption key={o.id} id={o.id} image={o.image} isNone={false} label={o.label} active={draft.outfit === o.id}
+                                                disabled={disabledCategories.includes('outfits')} disabledReason="Bloqueado"
+                                                onClick={() => set('outfit', o.id)} />
+                                        ))}
+                                    </>
+                                )}
 
                                 {activeTab === 'gender' && getCharacterOptions().map(g => (
                                     <ItemOption key={g.id} id={g.id} image={(g as any).image} emoji={(g as any).emoji} label={g.label} active={draft.gender === g.id}
