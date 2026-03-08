@@ -32,6 +32,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
     const fetchItems = async () => {
         setLoading(true);
         const { data, error } = await supabase.from('shop_items').select('*').order('created_at', { ascending: false });
+        console.log('ShopItems DB Response:', data);
         if (error) {
             addLog(`Erro ao carregar itens da loja: ${error.message}`);
         } else {
