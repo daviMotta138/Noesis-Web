@@ -7,7 +7,7 @@ import { audio } from '../lib/audio';
 import shieldImg from '../assets/shield.png';
 
 export const GiftClaimOverlay = () => {
-    const { user, profile, fetchProfile, pendingGift, checkPendingGifts } = useGameStore();
+    const { user, fetchProfile, pendingGift, checkPendingGifts } = useGameStore();
     const [claiming, setClaiming] = useState(false);
     const [claimed, setClaimed] = useState(false);
 
@@ -29,17 +29,6 @@ export const GiftClaimOverlay = () => {
         audio.play('click');
 
         try {
-            const metadata = pendingGift.metadata || {};
-            const itemCategory = metadata.category || 'shield';
-            const shieldAmt = metadata.shield_amount || 0;
-
-            if (itemCategory === 'shield') {
-                const currentShields = profile?.shield_count || 0;
-                await supabase.from('profiles')
-                    .update({ shield_count: currentShields + shieldAmt })
-                    .eq('id', user?.id);
-            }
-
             await supabase.from('notifications')
                 .update({ claimed: true, read_at: new Date().toISOString() })
                 .eq('id', pendingGift.id);

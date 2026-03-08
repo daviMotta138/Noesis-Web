@@ -407,7 +407,7 @@ export default function ShopPage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[100] flex flex-col justify-end md:justify-center items-center p-4 bg-[var(--color-modal-overlay)] backdrop-blur-sm"
+                            className="fixed inset-0 z-[100] flex flex-col justify-end md:justify-center items-center p-4 bg-[#0D0F1C]/80"
                             onClick={() => { setSelectedItem(null); setIsGifting(false); }}
                         >
                             <button onClick={() => { setSelectedItem(null); setIsGifting(false); }} className="absolute top-6 right-6 p-2 rounded-full pointer-events-auto z-10" style={{ background: 'var(--color-glass-strong)', color: 'var(--color-text)' }}>
@@ -419,7 +419,7 @@ export default function ShopPage() {
                                 animate={{ y: 0, scale: 1 }}
                                 exit={{ y: 100, scale: 0.9 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full max-w-sm rounded-[2rem] overflow-hidden"
+                                className="w-full max-w-sm rounded-[2rem] overflow-y-auto custom-scrollbar max-h-[90vh]"
                                 style={{
                                     background: 'var(--color-card)',
                                     border: `2px solid ${selectedItem.borderStyle}`,
@@ -427,7 +427,7 @@ export default function ShopPage() {
                                 }}
                             >
                                 {/* Showcase Image Area */}
-                                <div className="h-48 relative flex items-center justify-center border-b border-[var(--color-border)]" style={{ background: selectedItem.bgStyle }}>
+                                <div className="h-48 shrink-0 relative flex items-center justify-center border-b border-[var(--color-border)]" style={{ background: selectedItem.bgStyle }}>
                                     <div className="text-8xl drop-shadow-2xl">
                                         {selectedItem.category === 'shield' ? (
                                             <img src={shieldImg} className="w-28 h-28 object-contain animate-pulse" alt="" />
@@ -494,15 +494,13 @@ export default function ShopPage() {
                                                     <AnimatePresence>
                                                         {isDropdownOpen && (
                                                             <motion.div
-                                                                initial={{ opacity: 0, y: -10, scaleY: 0.95 }}
-                                                                animate={{ opacity: 1, y: 0, scaleY: 1 }}
-                                                                exit={{ opacity: 0, y: -10, scaleY: 0.95 }}
-                                                                transition={{ duration: 0.15 }}
-                                                                className="absolute top-full left-0 right-0 mt-2 rounded-xl overflow-hidden z-20 origin-top flex flex-col max-h-48 overflow-y-auto custom-scrollbar"
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                exit={{ opacity: 0, height: 0 }}
+                                                                className="mt-2 rounded-xl border border-[#D4A853]/20 flex flex-col max-h-48 overflow-y-auto custom-scrollbar"
                                                                 style={{
                                                                     background: '#1A1D30',
-                                                                    border: '1px solid var(--color-border-glow)',
-                                                                    boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                                                                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)'
                                                                 }}
                                                             >
                                                                 {friends.map((f, i) => (
