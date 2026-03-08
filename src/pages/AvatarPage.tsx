@@ -75,7 +75,7 @@ export default function AvatarPage() {
 
         const disabledCats: string[] = [];
         eqIds.forEach(eqId => {
-            const def = shopItems.find(i => i.id === eqId);
+            const def = shopItems.find(i => i.id === eqId || (i.asset_key && i.asset_key === eqId));
             if (def && def.disabled_categories) {
                 disabledCats.push(...def.disabled_categories);
             }
@@ -142,7 +142,7 @@ export default function AvatarPage() {
 
     // Calculate which categories are disabled by the currently equipped items
     const disabledCategories = equippedItemIds.reduce((acc, eqId) => {
-        const itemDef = shopItems.find(i => i.id === eqId);
+        const itemDef = shopItems.find(i => i.id === eqId || (i.asset_key && i.asset_key === eqId));
         if (itemDef && itemDef.disabled_categories) {
             itemDef.disabled_categories.forEach((cat: string) => {
                 if (!acc.includes(cat)) acc.push(cat);
@@ -157,7 +157,7 @@ export default function AvatarPage() {
 
             // Auto unequip items in newly disabled categories
             if (val !== 'none') {
-                const itemDef = shopItems.find(i => i.id === val);
+                const itemDef = shopItems.find(i => i.id === val || (i.asset_key && i.asset_key === val));
                 if (itemDef && itemDef.disabled_categories) {
                     itemDef.disabled_categories.forEach((cat: string) => {
                         if (['shirt', 'coat', 'pants', 'shoes', 'footwear', 'headwear', 'outfits'].includes(cat)) {
