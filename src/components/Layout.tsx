@@ -130,7 +130,7 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
             <MusicPlayerUI className="hidden md:block fixed bottom-6 right-6 z-[100]" />
 
             {/* ── Sidebar (Desktop) ── */}
-            <aside className="hidden md:flex w-60 flex-shrink-0 flex-col h-screen sticky top-0"
+            <aside id="tutorial-nav-desktop" className="hidden md:flex w-60 flex-shrink-0 flex-col h-screen sticky top-0"
                 style={{ background: 'var(--color-deep)', borderRight: '1px solid var(--color-border)' }}>
 
                 {/* Logo */}
