@@ -8,6 +8,7 @@ import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
 import type { AvatarConfig } from '../components/Avatar2D';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FriendProfile {
@@ -460,7 +461,7 @@ export default function FriendsPage() {
                     </div>
 
                     {/* Search & Add */}
-                    <div className="panel p-4" style={{ border: '1px solid var(--color-border-glow)' }}>
+                    <div id="tutorial-friends-search" className="panel p-4" style={{ border: '1px solid var(--color-border-glow)' }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--color-text-muted)' }}>
                             <UserPlus size={11} className="inline mr-1" />Adicionar amigo
                         </p>
@@ -547,7 +548,7 @@ export default function FriendsPage() {
                     )}
 
                     {/* Friends list */}
-                    <div className="panel p-4 flex-1">
+                    <div id="tutorial-friends-list" className="panel p-4 flex-1">
                         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--color-text-muted)' }}>
                             <Users size={11} className="inline mr-1" />Amigos ({accepted.length})
                         </p>
@@ -707,12 +708,33 @@ export default function FriendsPage() {
                 )}
             </AnimatePresence>
 
-            {/* ── Full Body Avatar Modal ── */}
             <FullBodyAvatarModal
                 open={!!fullBodyFriend}
                 onClose={() => setFullBodyFriend(null)}
                 avatarConfig={fullBodyFriend?.avatar_config}
                 displayName={fullBodyFriend?.display_name || ''}
+            />
+
+            <TutorialOverlay
+                tutorialKey="friends_seen"
+                steps={[
+                    {
+                        target: 'body',
+                        content: 'Bem-vindo à aba Social! Conecte-se com seus amigos.',
+                        placement: 'center',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-friends-search',
+                        content: 'Para adicionar um amigo, digite a hashtag dele aqui. A hashtag é aquele código que fica logo após o nome dele!',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-friends-list',
+                        content: 'Seus amigos aparecerão aqui com os dias da ofensiva deles à vista! Clicar em um amigo abre painéis para ver as estatísticas, conversar ou até mesmo enviar presentes.',
+                        disableBeacon: true,
+                    }
+                ]}
             />
         </div>
     );

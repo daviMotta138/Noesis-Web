@@ -9,6 +9,8 @@ import { drawWords, WORD_COUNT_OPTIONS } from '../lib/words';
 import { scoreAnswers } from '../lib/levenshtein';
 import { MemoryCard } from '../components/MemoryCard';
 import { Timer } from '../components/Timer';
+import { TutorialOverlay } from '../components/TutorialOverlay';
+import { TutorialGameFlow } from '../components/TutorialGameFlow';
 import { audio } from '../lib/audio';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
@@ -135,7 +137,7 @@ function ViewingPhase() {
                             Palácio da<br /><span className="text-gradient-gold">Memória</span>
                         </h1>
                     </div>
-                    <div className="flex flex-col gap-2 items-end mt-1">
+                    <div id="tutorial-economy" className="flex flex-col gap-2 items-end mt-1">
                         <button onClick={() => navigate('/streak')}
                             className="badge-fire cursor-pointer hover:opacity-80 transition-all">
                             <Flame size={11} />{profile?.streak ?? 0} dias
@@ -222,7 +224,7 @@ function ViewingPhase() {
                     {/* CTA */}
                     <div>
                         {!flipped ? (
-                            <div className="space-y-3">
+                            <div className="space-y-3" id="tutorial-start-btn">
                                 <button onClick={handleFlip} disabled={loading} className="btn-gold w-full flex items-center justify-center gap-2">
                                     {loading ? 'Iniciando...' : <>VIRAR CARTAS <ChevronRight size={16} /></>}
                                 </button>
@@ -884,8 +886,14 @@ function ResultPhase() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HomePage() {
-    const { user, phase, loadActiveSession } = useGameStore();
+    const { user, phase, loadActiveSession, profile } = useGameStore();
     useEffect(() => { if (user?.id) loadActiveSession(user.id); }, [user?.id, loadActiveSession]);
+
+    // If they've seen the Home overlay tour but haven't played the simulated session
+    const tutorial_state = profile?.tutorial_state;
+    if (tutorial_state?.home_seen && !tutorial_state?.game_flow_seen) {
+        return <TutorialGameFlow />;
+    }
 
     return (
         <AnimatePresence mode="wait">
@@ -896,6 +904,41 @@ export default function HomePage() {
                 {phase === 'waiting' && <WaitingPhase />}
                 {phase === 'recall' && <RecallPhase />}
                 {phase === 'result' && <ResultPhase />}
+
+                {/* Tutorial Layer */}
+                {phase === 'viewing' && (
+                    <TutorialOverlay
+                        tutorialKey="home_seen"
+                        steps={[
+                            {
+                                target: 'body',
+                                content: (
+                                    <div className="text-center">
+                                        <h3 className="text-lg font-black text-gradient-gold mb-2">Bem-vindo ao Noesis</h3>
+                                        <p className="text-sm opacity-80">O lugar onde sua memória vira um recurso precioso!</p>
+                                    </div>
+                                ),
+                                placement: 'center',
+                                disableBeacon: true,
+                            },
+                            {
+                                target: '#tutorial-start-btn',
+                                content: 'Aqui você inicia suas sessões de estudo. Clique para virar as cartas quando estiver pronto e iniciar um ciclo de memorização.',
+                                disableBeacon: true,
+                            },
+                            {
+                                target: '#tutorial-economy',
+                                content: 'Sua consistência gera recompensas! O fogo indica seus dias seguidos (Ofensiva). Suas moedas (Nous) aumentam ao acertar os desafios.',
+                                disableBeacon: true,
+                            },
+                            {
+                                target: '#tutorial-nav',
+                                content: 'Use a barra inferior para navegar! Acesse o Armário, a Loja Diária, Amigos e o Ranking das ligas.',
+                                disableBeacon: true,
+                            }
+                        ]}
+                    />
+                )}
             </motion.div>
         </AnimatePresence>
     );

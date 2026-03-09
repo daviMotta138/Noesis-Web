@@ -10,6 +10,7 @@ import { DemotionModal } from '../components/DemotionModal';
 import { FlippableProfilePic } from '../components/FlippableProfilePic';
 import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
 import type { AvatarConfig } from '../components/Avatar2D';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 
 function getNextSunday20h() {
     const now = new Date();
@@ -338,7 +339,7 @@ export default function RankingPage() {
                 </div>
 
                 {/* League Tabs */}
-                <div className="flex overflow-x-auto gap-2 mt-6 pb-2" style={{ scrollbarWidth: 'none' }}>
+                <div id="tutorial-ranking-leagues" className="flex overflow-x-auto gap-2 mt-6 pb-2" style={{ scrollbarWidth: 'none' }}>
                     {LEAGUES.map(({ id, icon: Icon, color }) => (
                         <button key={id} onClick={() => setTab(id)}
                             className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all relative"
@@ -371,7 +372,7 @@ export default function RankingPage() {
                         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Ainda não há jogadores nesta divisão.</p>
                     </div>
                 ) : (
-                    <div className="px-5 space-y-3 mt-4">
+                    <div id="tutorial-ranking-list" className="px-5 space-y-3 mt-4">
                         {data.map((entry, i) => {
                             // Position info
                             const pos = i + 1;
@@ -472,6 +473,28 @@ export default function RankingPage() {
                     </div>
                 )
             }
+
+            <TutorialOverlay
+                tutorialKey="ranking_seen"
+                steps={[
+                    {
+                        target: 'body',
+                        content: 'Bem-vindo ao Ranking!',
+                        placement: 'center',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-ranking-leagues',
+                        content: 'Estas são as divisões. Você só compete com os jogadores que estão na MESMA liga que você.',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-ranking-list',
+                        content: 'Garantir uma boa posição até o Domingo às 20h promove você de liga. Mas cuidado com a Zona de Rebaixamento em vermelho!',
+                        disableBeacon: true,
+                    }
+                ]}
+            />
         </div >
     );
 }

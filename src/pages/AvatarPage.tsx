@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Check, Sparkles, AlertCircle } from 'lucide-
 import { useGameStore } from '../store/useGameStore';
 import { supabase } from '../lib/supabase';
 import { Avatar2D, DEFAULT_AVATAR_CONFIG, type AvatarConfig } from '../components/Avatar2D';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 
 const PANTS_OPTIONS = [
     { id: 'calca-bege' as const, label: 'Bege', image: '/avatars/man/calca-bege.png', gender: 'man' },
@@ -373,7 +374,7 @@ export default function AvatarPage() {
                             </motion.div>
                         </div>
 
-                        <div ref={scrollRef} className="px-5 flex gap-2 overflow-x-auto pb-2 relative z-10" style={{ scrollbarWidth: 'none' }}>
+                        <div ref={scrollRef} id="tutorial-avatar-category" className="px-5 flex gap-2 overflow-x-auto pb-2 relative z-10" style={{ scrollbarWidth: 'none' }}>
                             {[
                                 { id: 'outfits', label: 'Conjuntos', emoji: '🛍️', disabledKey: 'outfits' },
                                 { id: 'gender', label: 'Personagem', emoji: '👦' },
@@ -423,7 +424,7 @@ export default function AvatarPage() {
                     </div>
 
                     {/* Content Area (Scrollable grid based on active tab) */}
-                    <div className="flex-1 overflow-y-auto px-5 pb-32">
+                    <div id="tutorial-avatar-items" className="flex-1 overflow-y-auto px-5 pb-32">
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={activeTab}
@@ -568,6 +569,7 @@ export default function AvatarPage() {
                     )}
 
                     <button
+                        id="tutorial-avatar-equip"
                         onClick={handleSave}
                         disabled={saving}
                         className="flex-1 py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
@@ -590,6 +592,32 @@ export default function AvatarPage() {
 
             </div>
 
+            <TutorialOverlay
+                tutorialKey="avatar_seen"
+                steps={[
+                    {
+                        target: 'body',
+                        content: 'Bem-vindo ao Armário! Aqui você define o seu estilo e equipa as roupas que possui ou comprou.',
+                        placement: 'center',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-avatar-category',
+                        content: 'Navegue por estas abas para encontrar estilos e peças compatíveis com seu personagem. Algumas peças desativam outras automaticamente (ex: um conjunto fecha a camisa).',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-avatar-items',
+                        content: 'Aqui ficam seus itens! As bordas coloridas indicam a raridade. Ah, se um item possuir variações de cor/estilo, elas aparecerão no rodapé ao selecioná-lo!',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-avatar-equip',
+                        content: 'Não se esqueça de clicar em EQUIPAR para salvar seu novo visual. Divirta-se!',
+                        disableBeacon: true,
+                    }
+                ]}
+            />
         </div>
     );
 }

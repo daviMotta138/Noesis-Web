@@ -44,6 +44,7 @@ export interface Profile {
     last_season_rank?: number | null;
     promotion_seen?: boolean;
     demotion_seen?: boolean;
+    tutorial_state?: Record<string, boolean>;
 }
 
 export interface DailySession {

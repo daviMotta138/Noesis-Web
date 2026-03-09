@@ -52,6 +52,9 @@ interface GameState {
     challengeReward: number;
     setChallengeHours: (hours: number) => void;
     setChallengeReward: (nous: number) => void;
+
+    // Tutorial
+    markTutorialSeen: (step: string) => Promise<void>;
 }
 
 export const useGameStore = create<GameState>()(
@@ -130,6 +133,22 @@ export const useGameStore = create<GameState>()(
                     .select()
                     .single();
                 if (!error && data) set({ profile: data as Profile });
+            },
+
+            markTutorialSeen: async (step: string) => {
+                const { profile, updateProfile } = get();
+                if (!profile) return;
+
+                const currentState = profile.tutorial_state || {};
+                if (currentState[step]) return; // already seen
+
+                const newState = { ...currentState, [step]: true };
+
+                // Optimistic UI update
+                set({ profile: { ...profile, tutorial_state: newState } });
+
+                // Real DB update
+                await updateProfile({ tutorial_state: newState });
             },
 
             startSession: async (words, challengeHours = 24, challengeReward = 35) => {
@@ -248,7 +267,7 @@ export const useGameStore = create<GameState>()(
                 set({ session: null, unlockAt: null });
             },
 
-            loadActiveSession: async (userId) => {
+            loadActiveSession: async (userId: string) => {
                 // Find today's session that hasn't been recalled yet
                 const { data } = await supabase
                     .from('daily_sessions')

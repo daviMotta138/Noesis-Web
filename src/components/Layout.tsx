@@ -275,7 +275,7 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
             )}
 
             {/* ── Mobile Bottom Nav ── */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[60] flex items-center justify-around h-16 px-2 safe-area-pb"
+            <nav id="tutorial-nav" className="md:hidden fixed bottom-0 left-0 right-0 z-[60] flex items-center justify-around h-16 px-2 safe-area-pb"
                 style={{ background: 'var(--color-overlay-heavy)', borderTop: '1px solid var(--color-border)', backdropFilter: 'blur(10px)' }}>
 
                 {/* Main bottom tabs */}

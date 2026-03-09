@@ -7,6 +7,7 @@ import { useGameStore } from '../store/useGameStore';
 import { audio } from '../lib/audio';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
+import { TutorialOverlay } from '../components/TutorialOverlay';
 
 interface ShopItem {
     id: string;
@@ -331,7 +332,7 @@ export default function ShopPage() {
                     <p className="text-xs uppercase tracking-widest font-bold">Carregando Estoque...</p>
                 </div>
             ) : (
-                <div className="space-y-12">
+                <div id="tutorial-shop-items" className="space-y-12">
                     {shopSections.map((section, idx) => (
                         <div key={idx} className="px-5">
                             <div className="flex items-center gap-3 mb-4">
@@ -421,7 +422,7 @@ export default function ShopPage() {
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-full max-w-sm rounded-[2rem] overflow-y-auto custom-scrollbar max-h-[90vh]"
                                 style={{
-                                    background: 'var(--color-card)',
+                                    background: '#1A1D30',
                                     border: `2px solid ${selectedItem.borderStyle}`,
                                     boxShadow: `0 0 60px ${selectedItem.borderStyle}30`
                                 }}
@@ -639,6 +640,29 @@ export default function ShopPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <TutorialOverlay
+                tutorialKey="shop_seen"
+                steps={[
+                    {
+                        target: 'body',
+                        content: 'Bem-vindo à Loja Diária! Aqui você pode usar seus Nós de Conhecimento para comprar cosméticos e vantagens.',
+                        placement: 'center',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: '#tutorial-shop-items',
+                        content: 'Navegue pelas seções! Temos conjuntos, roupas, escudos de proteção e muito mais.',
+                        disableBeacon: true,
+                    },
+                    {
+                        target: 'body',
+                        content: 'Tem algum amigo jogando? Ao clicar em qualquer item, você verá a opção "PRESENTEAR UM AMIGO". Aproveite para surpreender alguém!',
+                        placement: 'center',
+                        disableBeacon: true,
+                    }
+                ]}
+            />
         </div>
     );
 }
