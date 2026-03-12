@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import Joyride, { type Step, type CallBackProps, STATUS } from 'react-joyride';
 import { useGameStore } from '../store/useGameStore';
 
@@ -23,7 +24,7 @@ export function TutorialOverlay({ steps, tutorialKey, run }: TutorialOverlayProp
         }
     };
 
-    return (
+    const joyride = (
         <Joyride
             steps={steps}
             run={shouldRun}
@@ -32,6 +33,7 @@ export function TutorialOverlay({ steps, tutorialKey, run }: TutorialOverlayProp
             showSkipButton
             disableOverlayClose
             hideCloseButton
+            scrollToFirstStep
             callback={handleJoyrideCallback}
             styles={{
                 options: {
@@ -75,4 +77,8 @@ export function TutorialOverlay({ steps, tutorialKey, run }: TutorialOverlayProp
             }}
         />
     );
+
+    // Render via portal so Joyride's position:fixed overlay
+    // works correctly even inside CSS transform contexts (HorizontalCanvas)
+    return createPortal(joyride, document.body);
 }

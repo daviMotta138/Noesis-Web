@@ -932,7 +932,7 @@ export default function HomePage() {
                                 disableBeacon: true,
                             },
                             {
-                                target: '#tutorial-nav, #tutorial-nav-desktop',
+                                target: '#tutorial-nav',
                                 content: 'Use a barra inferior para navegar! Acesse o Armário, a Loja Diária, Amigos e o Ranking das ligas.',
                                 disableBeacon: true,
                             }
