@@ -309,28 +309,31 @@ export const GiftClaimOverlay = () => {
             const currentConfig = (profile?.avatar_config as any) || {};
             const newConfig: any = { ...currentConfig, [slot]: assetValue };
 
-            // Switch character gender if item requires a specific gender
+            // Switch character to one that matches item's required gender (from admin panel)
             const requiredGender: string = shopItem?.target_gender || 'all';
             if (requiredGender !== 'all') {
-                const currentGender = currentConfig.base_gender || 'man';
-                if (currentGender !== requiredGender) {
-                    // Find a character the user owns that matches the required gender
-                    const unlocked: string[] = currentConfig.unlocked_items || [];
-                    const { data: characters } = await supabase
-                        .from('shop_items')
-                        .select('id, asset_key, target_gender')
-                        .eq('category', 'gender')
-                        .eq('target_gender', requiredGender);
+                const unlocked: string[] = currentConfig.unlocked_items || [];
 
-                    const matchingChar = characters?.find(
-                        c => unlocked.includes(c.id) || c.id === 'default'
-                    ) || characters?.[0];
+                // Fetch all admin-panel gender characters that match
+                const { data: characters } = await supabase
+                    .from('shop_items')
+                    .select('id, asset_key, is_default, target_gender')
+                    .eq('category', 'gender')
+                    .eq('target_gender', requiredGender);
 
-                    if (matchingChar) {
-                        newConfig.gender = matchingChar.id;
-                        newConfig.base_image = matchingChar.asset_key;
-                        newConfig.base_gender = requiredGender;
-                        // Clear clothes that were for the other gender
+                // Priority: 1) user owns it, 2) is_default, 3) first in list
+                const matchingChar =
+                    characters?.find(c => unlocked.includes(c.id)) ||
+                    characters?.find(c => c.is_default) ||
+                    characters?.[0];
+
+                if (matchingChar) {
+                    newConfig.gender = matchingChar.id;
+                    newConfig.base_image = matchingChar.asset_key;
+                    newConfig.base_gender = requiredGender;
+
+                    // If switching gender, clear clothes incompatible with new gender
+                    if ((currentConfig.base_gender || 'man') !== requiredGender) {
                         ['shirt', 'coat', 'pants', 'footwear', 'headwear', 'outfit'].forEach(s => {
                             if (s !== slot) newConfig[s] = 'none';
                         });
