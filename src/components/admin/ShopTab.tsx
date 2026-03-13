@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Loader2, Plus, Edit2, Trash2, Image as ImageIcon, Check } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, Image as ImageIcon, Check, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useGameStore } from '../../store/useGameStore';
 
 interface ShopItem {
     id: string;
@@ -21,6 +22,7 @@ interface ShopItem {
 }
 
 export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
+    const { user } = useGameStore();
     const [items, setItems] = useState<ShopItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingItem, setEditingItem] = useState<ShopItem | null>(null);
@@ -99,6 +101,41 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
         }
     };
 
+    const handleTestGift = async (item: ShopItem) => {
+        if (!user) {
+            addLog('Erro: Usuário não autenticado.');
+            return;
+        }
+
+        const confirmGift = confirm(`Deseja enviar um presente de teste (${item.name}) para você mesmo?`);
+        if (!confirmGift) return;
+
+        try {
+            const { error } = await supabase.from('notifications').insert({
+                user_id: user.id,
+                type: 'gift_received',
+                title: '🎁 Presente de Teste!',
+                body: `Sistema Admin te enviou: ${item.name}`,
+                metadata: {
+                    item_id: item.id,
+                    name: item.name,
+                    emoji: item.category === 'shield' ? '🛡️' : '📦',
+                    category: item.category,
+                    shield_amount: item.category === 'shield' ? 1 : 0,
+                    sender_name: 'Sistema Admin',
+                    preview_url: item.preview_url
+                },
+                claimed: false
+            });
+
+            if (error) throw error;
+            addLog(`✓ Presente de teste (${item.name}) enviado para você!`);
+            alert('Presente enviado! Verifique a tela inicial para ver a nova interface.');
+        } catch (err: any) {
+            addLog(`Erro ao enviar presente de teste: ${err.message}`);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -117,7 +154,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
             </div>
 
             {loading ? (
-                <div className="flexjustify-center py-10"><Loader2 className="animate-spin text-white/50 w-8 h-8 mx-auto" /></div>
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-white/50 w-8 h-8 mx-auto" /></div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {items.map(item => (
@@ -146,6 +183,13 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
 
                             <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/5">
                                 <button
+                                    onClick={() => handleTestGift(item)}
+                                    className="p-2 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-amber-400 hover:text-amber-300 transition-colors"
+                                    title="Presentear-se (Teste)"
+                                >
+                                    <Gift size={16} />
+                                </button>
+                                <button
                                     onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
                                     className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors"
                                     title="Editar"
@@ -164,6 +208,7 @@ export function ShopTab({ addLog }: { addLog: (msg: string) => void }) {
                     ))}
                 </div>
             )}
+
 
             {/* Modal */}
             <AnimatePresence>
