@@ -53,6 +53,7 @@ export default function ShopPage() {
                 .from('shop_items')
                 .select('*')
                 .eq('is_visible', true)
+                .eq('is_default', false)
                 .order('price_nous', { ascending: true });
             if (error) {
                 console.error('Error fetching shop items:', error);
@@ -62,7 +63,7 @@ export default function ShopPage() {
 
             // Map generic database items into the UI interface
             const mappedItems: ShopItem[] = data.map((item: any) => {
-                let amount = 1;
+                let amount = item.shield_amount || 1;
                 // Fallbacks if not set
                 let bgStyle = 'linear-gradient(180deg, #FFFFFF80, #CCCCCC20)';
                 let borderStyle = '#FFFFFF';
@@ -84,12 +85,8 @@ export default function ShopPage() {
                 }
 
                 // Emojis based on category
-                if (item.category === 'shield') {
-                    emoji = '🛡️';
-                    if (item.id === 'shield_3') amount = 3;
-                    if (item.id === 'shield_5') amount = 5;
-                    if (item.id === 'shield_10') amount = 10;
-                } else if (item.category === 'headwear') emoji = '🧢';
+                if (item.category === 'shield') emoji = '🛡️';
+                else if (item.category === 'headwear') emoji = '🧢';
                 else if (item.category === 'hair') emoji = '💇';
                 else if (item.category === 'shirt') emoji = '👕';
                 else if (item.category === 'outfits') emoji = '🛍️';
@@ -144,6 +141,7 @@ export default function ShopPage() {
 
         fetchShop();
     }, []);
+
 
     // Fetch friends when gifting opens
     useEffect(() => {
