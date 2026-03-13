@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Loader2, Package, Shirt } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { audio } from '../lib/audio';
@@ -242,7 +241,6 @@ function GiftRevealView({
 
 // ─── Main Overlay ─────────────────────────────────────────────────────────────
 export const GiftClaimOverlay = () => {
-    const navigate = useNavigate();
     const { user, profile, fetchProfile, updateProfile, pendingGift, checkPendingGifts, setPendingGift } = useGameStore();
     const [phase, setPhase] = useState<'closed' | 'reveal'>('closed');
     const [claiming, setClaiming] = useState(false);
@@ -299,22 +297,54 @@ export const GiftClaimOverlay = () => {
         };
 
         try {
+            // Fetch full item data: asset_key + target_gender
             const { data: shopItem } = await supabase
                 .from('shop_items')
-                .select('asset_key, category')
+                .select('asset_key, category, target_gender')
                 .eq('id', meta.item_id)
                 .single();
 
             const slot = CATEGORY_TO_SLOT[meta.category] || meta.category;
             const assetValue = shopItem?.asset_key || meta.item_id;
             const currentConfig = (profile?.avatar_config as any) || {};
-            await updateProfile({ avatar_config: { ...currentConfig, [slot]: assetValue } });
+            const newConfig: any = { ...currentConfig, [slot]: assetValue };
+
+            // Switch character gender if item requires a specific gender
+            const requiredGender: string = shopItem?.target_gender || 'all';
+            if (requiredGender !== 'all') {
+                const currentGender = currentConfig.base_gender || 'man';
+                if (currentGender !== requiredGender) {
+                    // Find a character the user owns that matches the required gender
+                    const unlocked: string[] = currentConfig.unlocked_items || [];
+                    const { data: characters } = await supabase
+                        .from('shop_items')
+                        .select('id, asset_key, target_gender')
+                        .eq('category', 'gender')
+                        .eq('target_gender', requiredGender);
+
+                    const matchingChar = characters?.find(
+                        c => unlocked.includes(c.id) || c.id === 'default'
+                    ) || characters?.[0];
+
+                    if (matchingChar) {
+                        newConfig.gender = matchingChar.id;
+                        newConfig.base_image = matchingChar.asset_key;
+                        newConfig.base_gender = requiredGender;
+                        // Clear clothes that were for the other gender
+                        ['shirt', 'coat', 'pants', 'footwear', 'headwear', 'outfit'].forEach(s => {
+                            if (s !== slot) newConfig[s] = 'none';
+                        });
+                    }
+                }
+            }
+
+            await updateProfile({ avatar_config: newConfig });
         } catch (e) {
             console.error('Auto-equip failed:', e);
         }
 
+        // Just claim — no navigation
         await markClaimed();
-        setTimeout(() => navigate('/avatar'), 2600);
     };
 
     if (!pendingGift) return null;
