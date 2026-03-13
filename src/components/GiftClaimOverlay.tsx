@@ -243,7 +243,7 @@ function GiftRevealView({
 // ─── Main Overlay ─────────────────────────────────────────────────────────────
 export const GiftClaimOverlay = () => {
     const navigate = useNavigate();
-    const { user, fetchProfile, pendingGift, checkPendingGifts, setPendingGift } = useGameStore();
+    const { user, profile, fetchProfile, updateProfile, pendingGift, checkPendingGifts, setPendingGift } = useGameStore();
     const [phase, setPhase] = useState<'closed' | 'reveal'>('closed');
     const [claiming, setClaiming] = useState(false);
     const [claimed, setClaimed] = useState(false);
@@ -287,6 +287,32 @@ export const GiftClaimOverlay = () => {
     };
 
     const handleEquip = async () => {
+        const meta = pendingGift?.metadata || {};
+
+        // Map shop category → avatar_config slot
+        const CATEGORY_TO_SLOT: Record<string, string> = {
+            shirt: 'shirt', coat: 'coat', pants: 'pants',
+            shoes: 'footwear', footwear: 'footwear',
+            headwear: 'headwear', accessory: 'headwear',
+            outfits: 'outfit', effect: 'effect',
+            item: 'item', pet: 'pet', gender: 'gender',
+        };
+
+        try {
+            const { data: shopItem } = await supabase
+                .from('shop_items')
+                .select('asset_key, category')
+                .eq('id', meta.item_id)
+                .single();
+
+            const slot = CATEGORY_TO_SLOT[meta.category] || meta.category;
+            const assetValue = shopItem?.asset_key || meta.item_id;
+            const currentConfig = (profile?.avatar_config as any) || {};
+            await updateProfile({ avatar_config: { ...currentConfig, [slot]: assetValue } });
+        } catch (e) {
+            console.error('Auto-equip failed:', e);
+        }
+
         await markClaimed();
         setTimeout(() => navigate('/avatar'), 2600);
     };

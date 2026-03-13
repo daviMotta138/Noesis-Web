@@ -245,7 +245,8 @@ export default function ShopPage() {
                         emoji: selectedItem.emoji,
                         category: selectedItem.category,
                         shield_amount: shieldAmt,
-                        sender_name: profile?.display_name
+                        sender_name: profile?.display_name,
+                        preview_url: selectedItem.image || null,
                     },
                     claimed: false
                 });
