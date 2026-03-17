@@ -61,7 +61,6 @@ export default function RankingPage() {
     const [showFullBody, setShowFullBody] = useState(false);
     const [friendStatus, setFriendStatus] = useState<'none' | 'pending_sent' | 'accepted'>('none');
     const [addingFriend, setAddingFriend] = useState(false);
-    const [fullBodyPlayer, setFullBodyPlayer] = useState<RankEntry | null>(null);
 
     // Close panel quando navega
     useEffect(() => { setSelectedPlayer(null); }, [location.pathname]);
@@ -352,13 +351,7 @@ export default function RankingPage() {
             )}
 
 
-            {/* Full Body Overlay */}
-            <FullBodyAvatarModal
-                open={!!fullBodyPlayer}
-                onClose={() => setFullBodyPlayer(null)}
-                avatarConfig={fullBodyPlayer?.avatar_config}
-                displayName={fullBodyPlayer?.display_name || ''}
-            />
+
 
             {/* Modals */}
             {

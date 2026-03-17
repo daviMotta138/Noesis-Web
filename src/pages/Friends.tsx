@@ -355,7 +355,6 @@ export default function FriendsPage() {
     const [activePanel, setActivePanel] = useState<'none' | 'chat' | 'profile'>('none');
     const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
     const [giftModalFriend, setGiftModalFriend] = useState<FriendProfile | null>(null);
-    const [fullBodyFriend, setFullBodyFriend] = useState<FriendProfile | null>(null);
     const [giftStatus, setGiftStatus] = useState<{ loading: boolean; error: string | null; success: string | null }>({ loading: false, error: null, success: null });
 
     const fetchFriends = async () => {
@@ -748,12 +747,7 @@ export default function FriendsPage() {
                 )}
             </AnimatePresence>
 
-            <FullBodyAvatarModal
-                open={!!fullBodyFriend}
-                onClose={() => setFullBodyFriend(null)}
-                avatarConfig={fullBodyFriend?.avatar_config}
-                displayName={fullBodyFriend?.display_name || ''}
-            />
+
 
             <TutorialOverlay
                 tutorialKey="friends_seen"
