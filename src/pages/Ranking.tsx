@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Medal, Star, Crown, Shield, UserPlus, Check, X, Maximize2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
@@ -270,7 +273,7 @@ export default function RankingPage() {
 
                                     {/* Enlarge Button */}
                                     <button 
-                                        onClick={(e) => {
+                                        onClick={(e: React.MouseEvent) => {
                                             e.stopPropagation();
                                             setShowFullBody(true);
                                         }}

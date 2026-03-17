@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Gift, MessageCircle, UserPlus, Check, X, Search, Users, ChevronLeft, Maximize2, Flame } from 'lucide-react';
+import { Send, Gift, MessageCircle, UserPlus, Check, X, Search, Users, ChevronLeft, Maximize2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { FlippableProfilePic } from '../components/FlippableProfilePic';
@@ -8,6 +8,8 @@ import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
 import type { AvatarConfig } from '../components/Avatar2D';
 import { Avatar2D, DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import coinImg from '../assets/coin.webp';
+import shieldImg from '../assets/shield.png';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface FriendProfile {
@@ -220,9 +222,7 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
 
 // ─── Friend Profile Modal ─────────────────────────────────────────────────────
 function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile; onClose: () => void; onChat: () => void; }) {
-    const [avatarStyles, setAvatarStyles] = useState<any>({ bottom: 35, top: 100, left: 224, width: 300, transform: 'scale(2)' });
     const [showFullBody, setShowFullBody] = useState(false);
-    const { profile: myProfile } = useGameStore();
 
     if (!friend) return null;
 
@@ -242,7 +242,7 @@ function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile;
                 </button>
 
                 {/* Full-body Avatar */}
-                <div className="absolute z-10 pointer-events-none" style={{ height: 220, ...avatarStyles }}>
+                <div className="absolute z-10 pointer-events-none" style={{ height: 220, bottom: 35, top: 100, left: 224, width: 300, transform: 'scale(2)' }}>
                     <Avatar2D config={{ ...DEFAULT_AVATAR_CONFIG, ...(friend.avatar_config ?? {}) }} mode="full" className="w-full h-full"
                         style={{ filter: 'drop-shadow(0 4px 20px rgba(139,92,246,0.5))' }} />
                 </div>
