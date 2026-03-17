@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Medal, Star, Crown, Shield, UserPlus, Check, X } from 'lucide-react';
+import { Trophy, Medal, Star, Crown, Shield, UserPlus, Check, X, Maximize2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { PromotionModal } from '../components/PromotionModal';
 import { DemotionModal } from '../components/DemotionModal';
-import { FlippableProfilePic } from '../components/FlippableProfilePic';
 import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
 import type { AvatarConfig } from '../components/Avatar2D';
+import { Avatar2D, DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+
 
 function getNextSunday20h() {
     const now = new Date();
@@ -46,9 +44,9 @@ const LEAGUES = [
 ];
 
 export default function RankingPage() {
-    const { user, profile } = useGameStore();
+    const { user, profile: myProfile } = useGameStore();
     const location = useLocation();
-    const [tab, setTab] = useState<string>(profile?.league || 'Bronze');
+    const [tab, setTab] = useState<string>(myProfile?.league || 'Bronze');
     const [data, setData] = useState<RankEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [timeLeft, setTimeLeft] = useState<{ d: number, h: number, m: number } | null>(null);
@@ -57,11 +55,12 @@ export default function RankingPage() {
     const [promotionData, setPromotionData] = useState<{ from: string; to: string } | null>(null);
     const [demotionData, setDemotionData] = useState<{ from: string; to: string } | null>(null);
     const [selectedPlayer, setSelectedPlayer] = useState<RankEntry | null>(null);
+    const [showFullBody, setShowFullBody] = useState(false);
     const [friendStatus, setFriendStatus] = useState<'none' | 'pending_sent' | 'accepted'>('none');
     const [addingFriend, setAddingFriend] = useState(false);
     const [fullBodyPlayer, setFullBodyPlayer] = useState<RankEntry | null>(null);
 
-    // Close panel when navigating away
+    // Close panel quando navega
     useEffect(() => { setSelectedPlayer(null); }, [location.pathname]);
 
     useEffect(() => {
@@ -75,13 +74,14 @@ export default function RankingPage() {
             });
         };
         update();
-        const interval = setInterval(update, 60000); // update every minute
+        const interval = setInterval(update, 60000);
         return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
-        if (profile?.league && !tab) setTab(profile.league);
-    }, [profile?.league]);
+        if (!myProfile) return;
+        setTab(myProfile.league || 'Bronze');
+    }, [myProfile]);
 
     useEffect(() => {
         fetchRanking();
@@ -177,7 +177,7 @@ export default function RankingPage() {
     };
 
     const handleAddFriendFromRanking = async () => {
-        if (!selectedPlayer || !user?.id || !profile) return;
+        if (!selectedPlayer || !user?.id || !myProfile) return;
         setAddingFriend(true);
         await supabase.from('friendships').insert({
             user_id: user.id, friend_id: selectedPlayer.id, status: 'pending',
@@ -186,12 +186,29 @@ export default function RankingPage() {
             user_id: selectedPlayer.id,
             type: 'friend_request',
             title: 'Solicitação de amizade',
-            body: `${profile.display_name} quer ser seu amigo!`,
-            metadata: JSON.stringify({ sender_id: user.id, sender_name: profile.display_name }),
+            body: `${myProfile.display_name} quer ser seu amigo!`,
+            metadata: JSON.stringify({ sender_id: user.id, sender_name: myProfile.display_name }),
         });
         setFriendStatus('pending_sent');
         setAddingFriend(false);
     };
+
+    useEffect(() => {
+        const checkUserRank = () => {
+            if (data.length > 0 && user?.id) {
+                // Rank logic omitted as it is not displayed in this view
+                
+                const top3 = data && data.slice(0, 3);
+                const userInTop3 = top3 && top3.some(p => p.id === user?.id);
+                
+                if (userInTop3 && myProfile?.league === tab) {
+                    console.log('Parabéns! Você está no Top 3 da sua liga atual.');
+                }
+            }
+        };
+
+        checkUserRank();
+    }, [data, user, myProfile, tab]);
 
     return (
         <div className="min-h-screen pb-24">
@@ -226,52 +243,104 @@ export default function RankingPage() {
                                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
                                 transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                                 onClick={e => e.stopPropagation()}
-                                className="w-[calc(100vw-2rem)] max-w-sm rounded-3xl p-6"
+                                className="w-[calc(100vw-2rem)] max-w-sm rounded-3xl overflow-hidden"
                                 style={{ background: 'var(--color-card)', border: '1px solid var(--color-border-glow)' }}
                             >
-                                <div className="flex items-start gap-4 mb-5">
-                                    <button onClick={() => setFullBodyPlayer(selectedPlayer)} className="transition-transform active:scale-95">
-                                        <FlippableProfilePic
-                                            avatarUrl={selectedPlayer.avatar_url}
-                                            avatarConfig={selectedPlayer.avatar_config}
-                                            fallbackAvatar={getAvatar(selectedPlayer.display_name)}
-                                            size={64}
-                                            autoFlip={true}
-                                            className="shadow-lg border border-white/10"
-                                        />
-                                    </button>
-                                    <div className="flex-1 min-w-0">
-                                        <h2 className="text-xl font-black text-gradient-gold truncate">{selectedPlayer.display_name}</h2>
-                                        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>{selectedPlayer.league} · #{selectedPlayer.friend_id}</p>
-                                        <div className="flex gap-3 mt-2">
-                                            <span className="text-xs font-bold" style={{ color: 'var(--color-gold)' }}>{selectedPlayer.score} pts</span>
-                                            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>🔥 {selectedPlayer.streak} dias</span>
-                                        </div>
-                                    </div>
+                                {/* Hero banner with Avatar2D */}
+                                <div className="relative overflow-hidden" style={{
+                                    background: 'linear-gradient(180deg, rgba(139,92,246,0.3) 0%, var(--color-card) 100%)',
+                                    minHeight: 200
+                                }}>
+                                    {/* Close button */}
                                     <button onClick={() => setSelectedPlayer(null)}
-                                        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                                        style={{ background: 'var(--color-glass)', color: 'var(--color-text-muted)' }}>
+                                        className="absolute top-3 right-3 z-30 w-8 h-8 rounded-xl flex items-center justify-center"
+                                        style={{ background: 'rgba(0,0,0,0.4)', color: 'var(--color-text-muted)', backdropFilter: 'blur(6px)' }}>
                                         <X size={16} />
                                     </button>
-                                </div>
-                                {friendStatus === 'none' && (
-                                    <button onClick={handleAddFriendFromRanking} disabled={addingFriend}
-                                        className="btn-gold w-full flex items-center justify-center gap-2">
-                                        {addingFriend ? 'Enviando...' : <><UserPlus size={15} /> Adicionar como amigo</>}
+
+                                    {/* Avatar */}
+                                    <div className="absolute z-10 pointer-events-none" style={{ height: 195, bottom: 0, top: 99, left: 184, width: 152, transform: 'scale(2)' }}>
+                                        <Avatar2D
+                                            config={{ ...DEFAULT_AVATAR_CONFIG, ...(selectedPlayer.avatar_config ?? {}) }}
+                                            mode="full"
+                                            className="w-full h-full"
+                                            style={{ filter: 'drop-shadow(0 4px 20px rgba(139,92,246,0.5))' }}
+                                        />
+                                    </div>
+
+                                    {/* Enlarge Button */}
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowFullBody(true);
+                                        }}
+                                        className="absolute top-4 right-4 z-[25] w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md border border-white/10 hover:bg-black/60 transition-colors"
+                                    >
+                                        <Maximize2 size={18} />
                                     </button>
-                                )}
-                                {friendStatus === 'pending_sent' && (
-                                    <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
-                                        style={{ background: 'rgba(212,168,83,0.08)', color: 'var(--color-gold-dim)', border: '1px solid rgba(212,168,83,0.2)' }}>
-                                        <Check size={15} /> Solicitação enviada
+
+                                    {/* Full Body Modal */}
+                                    <FullBodyAvatarModal 
+                                        open={showFullBody}
+                                        onClose={() => setShowFullBody(false)}
+                                        avatarConfig={selectedPlayer.avatar_config}
+                                        displayName={selectedPlayer.display_name}
+                                    />
+
+                                    {/* Debugger for Admins - Hidden */}
+                                    {/* myProfile?.is_admin && (
+                                        <AvatarDebugger 
+                                            initialBottom={0}
+                                            initialTop={99}
+                                            initialLeft={184}
+                                            initialWidth={152}
+                                            initialScale={2}
+                                            onUpdate={setAvatarStyles}
+                                        />
+                                    ) */}
+
+                                    {/* Name / info overlay */}
+                                    <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 z-20"
+                                        style={{ background: 'linear-gradient(to top, var(--color-card) 55%, transparent)' }}>
+                                        <h2 className="text-xl font-black text-gradient-gold leading-tight">{selectedPlayer.display_name}</h2>
+                                        <p className="text-xs mt-0.5" style={{ color: activeLeagueConfig.color }}>
+                                            Liga {selectedPlayer.league} · #{selectedPlayer.friend_id}
+                                        </p>
                                     </div>
-                                )}
-                                {friendStatus === 'accepted' && (
-                                    <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
-                                        style={{ background: 'rgba(45,212,191,0.08)', color: 'var(--color-success)', border: '1px solid rgba(45,212,191,0.2)' }}>
-                                        <Check size={15} /> Já são amigos
+                                </div>
+
+                                {/* Stats + action */}
+                                <div className="p-5 pt-4 space-y-4">
+                                    <div className="flex gap-3">
+                                        <div className="flex-1 rounded-2xl p-3 text-center" style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
+                                            <p className="text-lg font-black" style={{ color: 'var(--color-gold)' }}>{selectedPlayer.score}</p>
+                                            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Pontos</p>
+                                        </div>
+                                        <div className="flex-1 rounded-2xl p-3 text-center" style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
+                                            <p className="text-lg font-black" style={{ color: 'var(--color-fire)' }}>🔥 {selectedPlayer.streak}</p>
+                                            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ofensiva</p>
+                                        </div>
                                     </div>
-                                )}
+
+                                    {friendStatus === 'none' && (
+                                        <button onClick={handleAddFriendFromRanking} disabled={addingFriend}
+                                            className="btn-gold w-full flex items-center justify-center gap-2">
+                                            {addingFriend ? 'Enviando...' : <><UserPlus size={15} /> Adicionar como amigo</>}
+                                        </button>
+                                    )}
+                                    {friendStatus === 'pending_sent' && (
+                                        <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
+                                            style={{ background: 'rgba(212,168,83,0.08)', color: 'var(--color-gold-dim)', border: '1px solid rgba(212,168,83,0.2)' }}>
+                                            <Check size={15} /> Solicitação enviada
+                                        </div>
+                                    )}
+                                    {friendStatus === 'accepted' && (
+                                        <div className="w-full py-3 rounded-2xl text-center text-sm font-bold flex items-center justify-center gap-2"
+                                            style={{ background: 'rgba(45,212,191,0.08)', color: 'var(--color-success)', border: '1px solid rgba(45,212,191,0.2)' }}>
+                                            <Check size={15} /> Já são amigos
+                                        </div>
+                                    )}
+                                </div>
                             </motion.div>
                         </motion.div>
                     )}
@@ -351,7 +420,7 @@ export default function RankingPage() {
                             }}>
                             <Icon size={16} style={{ color: tab === id ? color : 'var(--color-text-muted)' }} />
                             {id}
-                            {profile?.league === id && <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: color }} />}
+                            {myProfile?.league === id && <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: color }} />}
                         </button>
                     ))}
                 </div>

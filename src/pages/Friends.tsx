@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Send, Search, Check, X, Users, MessageCircle, ChevronLeft, Gift } from 'lucide-react';
+import { Send, Gift, MessageCircle, UserPlus, Check, X, Search, Users, ChevronLeft, Maximize2, Flame } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useGameStore } from '../store/useGameStore';
 import { FlippableProfilePic } from '../components/FlippableProfilePic';
 import { FullBodyAvatarModal } from '../components/FullBodyAvatarModal';
 import type { AvatarConfig } from '../components/Avatar2D';
-import coinImg from '../assets/coin.webp';
-import shieldImg from '../assets/shield.png';
+import { Avatar2D, DEFAULT_AVATAR_CONFIG } from '../components/Avatar2D';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -218,39 +217,78 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
     );
 }
 
+
 // ─── Friend Profile Modal ─────────────────────────────────────────────────────
-function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend: FriendProfile; onClose: () => void; onChat: () => void; onAvatarClick: () => void; }) {
+function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile; onClose: () => void; onChat: () => void; }) {
+    const [avatarStyles, setAvatarStyles] = useState<any>({ bottom: 35, top: 100, left: 224, width: 300, transform: 'scale(2)' });
+    const [showFullBody, setShowFullBody] = useState(false);
+    const { profile: myProfile } = useGameStore();
+
+    if (!friend) return null;
+
     return (
         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }} className="flex flex-col h-full">
-            <div className="flex items-center gap-3 p-5 flex-shrink-0"
-                style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <button onClick={onClose} style={{ color: 'var(--color-text-muted)' }}><ChevronLeft size={20} /></button>
-                <p className="font-bold" style={{ color: 'var(--color-text)' }}>Perfil do Amigo</p>
-            </div>
+            exit={{ opacity: 0, x: 20 }} className="flex flex-col h-full overflow-hidden">
 
-            <div className="flex-1 overflow-y-auto px-6 py-8">
-                {/* Avatar */}
-                <div className="flex justify-center mb-6">
-                    <button onClick={onAvatarClick} className="transition-transform active:scale-95">
-                        <FlippableProfilePic
-                            avatarUrl={friend.avatar_url}
-                            avatarConfig={friend.avatar_config}
-                            fallbackAvatar={friend.display_name.charAt(0).toUpperCase()}
-                            size={112} // 28 * 4
-                            autoFlip={true}
-                            className="shadow-xl flex-shrink-0"
-                        />
-                    </button>
+            {/* ── Hero header with Avatar ── */}
+            <div className="relative flex-shrink-0 overflow-hidden"
+                style={{ background: 'linear-gradient(180deg, rgba(139,92,246,0.25) 0%, var(--color-card) 100%)', minHeight: 240 }}>
+
+                {/* Back button */}
+                <button onClick={onClose}
+                    className="absolute top-4 left-4 z-30 w-9 h-9 rounded-xl flex items-center justify-center"
+                    style={{ background: 'rgba(0,0,0,0.35)', color: 'var(--color-text-muted)', backdropFilter: 'blur(8px)' }}>
+                    <ChevronLeft size={20} />
+                </button>
+
+                {/* Full-body Avatar */}
+                <div className="absolute z-10 pointer-events-none" style={{ height: 220, ...avatarStyles }}>
+                    <Avatar2D config={{ ...DEFAULT_AVATAR_CONFIG, ...(friend.avatar_config ?? {}) }} mode="full" className="w-full h-full"
+                        style={{ filter: 'drop-shadow(0 4px 20px rgba(139,92,246,0.5))' }} />
                 </div>
 
-                <h2 className="text-2xl font-black text-display text-center text-gradient-gold mb-1">
-                    {friend.display_name}
-                </h2>
-                <p className="text-center text-xs mb-8" style={{ color: 'var(--color-text-muted)' }}>{friend.friend_id}</p>
+                {/* Enlarge Button */}
+                <button 
+                    onClick={() => setShowFullBody(true)}
+                    className="absolute top-4 right-4 z-[25] w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md border border-white/10 hover:bg-black/60 transition-colors"
+                >
+                    <Maximize2 size={20} />
+                </button>
 
+                {/* Full Body Modal */}
+                <FullBodyAvatarModal 
+                    open={showFullBody}
+                    onClose={() => setShowFullBody(false)}
+                    avatarConfig={friend.avatar_config}
+                    displayName={friend.display_name}
+                />
+
+                {/* Debugger for Admins - Hidden by default now that we have values, can be uncommented if needed */}
+                {/* myProfile?.is_admin && (
+                    <AvatarDebugger
+                        initialBottom={35}
+                        initialTop={100}
+                        initialLeft={224}
+                        initialWidth={300}
+                        initialScale={2}
+                        onUpdate={setAvatarStyles}
+                    />
+                ) */}
+
+                {/* Name & info overlay */}
+                <div className="absolute bottom-0 left-0 right-0 px-5 pb-4 z-20"
+                    style={{ background: 'linear-gradient(to top, var(--color-card) 60%, transparent)' }}>
+                    <h2 className="text-2xl font-black text-display text-gradient-gold leading-tight">
+                        {friend.display_name}
+                    </h2>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{friend.friend_id}</p>
+                </div>
+            </div>
+
+            {/* ── Scrollable content ── */}
+            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 mb-8">
+                <div className="grid grid-cols-3 gap-2">
                     {[
                         { label: 'Ofensiva', val: `${friend.streak}`, icon: '🔥' },
                         { label: 'Pontos', val: friend.score.toLocaleString(), icon: '⭐' },
@@ -258,7 +296,7 @@ function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend:
                     ].map(({ label, val, icon }) => (
                         <div key={label} className="panel p-3 text-center"
                             style={{ border: '1px solid var(--color-border-glow)' }}>
-                            <p className="text-lg font-black flex items-center justify-center gap-1.5" style={{ color: 'var(--color-text)' }}>
+                            <p className="text-lg font-black flex items-center justify-center gap-1" style={{ color: 'var(--color-text)' }}>
                                 {label === 'Nous' ? <img src={coinImg} className="w-4 h-4 object-contain" alt="" /> : icon} {val}
                             </p>
                             <p className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
@@ -268,11 +306,11 @@ function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend:
 
                 {/* Badges */}
                 {friend.badges && friend.badges.length > 0 && (
-                    <div className="mb-8">
-                        <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-center mb-3" style={{ color: 'var(--color-text-muted)' }}>
+                    <div>
+                        <p className="text-[10px] tracking-[0.2em] uppercase font-bold mb-3" style={{ color: 'var(--color-text-muted)' }}>
                             Coleção de Broches
                         </p>
-                        <div className="flex flex-wrap justify-center gap-2">
+                        <div className="flex flex-wrap gap-2">
                             {friend.badges.map(b => {
                                 const [league, posStr] = b.split('_');
                                 const pos = parseInt(posStr) || 3;
@@ -284,10 +322,10 @@ function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend:
 
                                 return (
                                     <div key={b} className="flex flex-col items-center justify-center p-2 rounded-xl border relative overflow-hidden"
-                                        style={{ borderColor: `${color}40`, background: `${color}10`, width: 70, height: 80 }}>
+                                        style={{ borderColor: `${color}40`, background: `${color}10`, width: 64, height: 76 }}>
                                         <span className="text-2xl drop-shadow-lg mb-0.5" style={{ filter: `drop-shadow(0 0 6px ${color}80)` }}>{icon}</span>
                                         <span className="text-[8px] font-black uppercase text-center w-full truncate" style={{ color }}>{league}</span>
-                                        <span className="text-[7px] font-bold px-1.5 py-0.5 rounded-full mt-1" style={{ color: 'var(--color-text-sub)', background: 'var(--color-overlay)' }}>Top {pos}</span>
+                                        <span className="text-[7px] font-bold px-1 py-0.5 rounded-full mt-1 leading-none" style={{ color: 'var(--color-text-sub)', background: 'var(--color-overlay)' }}>Top {pos}</span>
                                     </div>
                                 );
                             })}
@@ -295,6 +333,7 @@ function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend:
                     </div>
                 )}
 
+                {/* Actions */}
                 <button onClick={onChat} className="btn-gold w-full flex items-center justify-center gap-2">
                     <MessageCircle size={16} /> Chat
                 </button>
@@ -302,6 +341,7 @@ function FriendProfileView({ friend, onClose, onChat, onAvatarClick }: { friend:
         </motion.div>
     );
 }
+
 
 // ─── Main Friends Page ────────────────────────────────────────────────────────
 export default function FriendsPage() {
@@ -311,7 +351,7 @@ export default function FriendsPage() {
     const [searchId, setSearchId] = useState('');
     const [searchResult, setSearchResult] = useState<{ display_name: string; friend_id: string; id: string } | null>(null);
     const [searchError, setSearchError] = useState<string | null>(null);
-    const [searching, setSending] = useState(false);
+    const [searching, setSearching] = useState(false);
     const [activePanel, setActivePanel] = useState<'none' | 'chat' | 'profile'>('none');
     const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
     const [giftModalFriend, setGiftModalFriend] = useState<FriendProfile | null>(null);
@@ -356,13 +396,13 @@ export default function FriendsPage() {
 
     const handleSearch = async () => {
         if (!searchId.trim()) return;
-        setSending(true); setSearchResult(null); setSearchError(null);
+        setSearching(true); setSearchResult(null); setSearchError(null);
         const { data } = await supabase
             .from('profiles')
             .select('id, display_name, friend_id')
             .eq('friend_id', searchId.trim())
             .single();
-        setSending(false);
+        setSearching(false);
         if (!data) { setSearchError('Usuário não encontrado.'); return; }
         if (data.id === user?.id) { setSearchError('Esse é você!'); return; }
         setSearchResult(data);
@@ -632,8 +672,8 @@ export default function FriendsPage() {
                                 friend={selectedFriend}
                                 onClose={closePanel}
                                 onChat={() => openChat(selectedFriend)}
-                                onAvatarClick={() => setFullBodyFriend(selectedFriend)}
                             />
+
                         </motion.div>
                     )}
                 </AnimatePresence>

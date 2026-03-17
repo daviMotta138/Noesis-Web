@@ -206,9 +206,12 @@ export const useGameStore = create<GameState>()(
                 let newStreak: number;
                 let newShields = currentShields;
 
+                const todayStr = new Date().toISOString().split('T')[0];
+                const alreadyPlayedToday = profile?.last_played_date === todayStr;
+
                 if (success) {
-                    // Correct recall — streak increases
-                    newStreak = currentStreak + 1;
+                    // Correct recall — streak increases ONLY if not already played today
+                    newStreak = alreadyPlayedToday ? currentStreak : currentStreak + 1;
                 } else if (currentShields > 0) {
                     // Failed but has shield — consume one shield, streak is preserved
                     newStreak = currentStreak;

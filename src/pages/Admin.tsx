@@ -154,7 +154,7 @@ function UsersTab({ addLog }: { addLog: (m: string) => void }) {
         const term = `%${search}%`;
         const { data, error } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, display_name, avatar_url, friend_id, streak, nous_coins, shield_count, league')
             .or(`display_name.ilike.${term},friend_id.ilike.${term}`)
             .order('created_at', { ascending: false })
             .limit(20);
@@ -164,7 +164,7 @@ function UsersTab({ addLog }: { addLog: (m: string) => void }) {
         setLoading(false);
     };
 
-    const updateUserValue = async (id: string, field: string, value: number) => {
+    const updateUserValue = async (id: string, field: string, value: number | string) => {
         const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', id);
         if (error) {
             addLog(`Erro ao atualizar ${field} para ${id}`);
@@ -208,6 +208,18 @@ function UsersTab({ addLog }: { addLog: (m: string) => void }) {
                             <div className="flex flex-col gap-1 items-start md:items-end flex-1 md:flex-none">
                                 <span className="text-[10px] text-gray-500 font-bold uppercase">Ofensiva</span>
                                 <input type="number" defaultValue={u.streak} onBlur={e => updateUserValue(u.id, 'streak', parseInt(e.target.value))} className="field w-full md:w-16 py-1 text-left md:text-right text-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1 items-start md:items-end flex-1 md:flex-none">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase">Liga</span>
+                                <select 
+                                    defaultValue={u.league} 
+                                    onChange={e => updateUserValue(u.id, 'league', e.target.value)} 
+                                    className="field w-full md:w-32 py-1 text-sm bg-transparent"
+                                >
+                                    {['Bronze', 'Prata', 'Ouro', 'Diamante', 'Campeonato'].map(l => (
+                                        <option key={l} value={l} className="bg-gray-900">{l}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="flex flex-col gap-1 items-start md:items-end flex-1 md:flex-none">
                                 <span className="text-[10px] text-gray-500 font-bold uppercase">Escudos</span>

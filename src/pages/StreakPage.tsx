@@ -7,23 +7,49 @@ import { useGameStore } from '../store/useGameStore';
 import shieldImg from '../assets/shield.png';
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
-function buildCalendar(activeDates: Set<string>): { date: Date; active: boolean; isToday: boolean }[] {
+function buildMonthCalendar(
+    activeDates: Set<string>,
+    shieldDates: Set<string>
+): { date: Date | null; active: boolean; shielded: boolean; isToday: boolean; isFuture: boolean }[] {
     const today = new Date();
-    const days: { date: Date; active: boolean; isToday: boolean }[] = [];
-    for (let i = 34; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
-        days.push({ date: d, active: activeDates.has(key), isToday: i === 0 });
+    const todayKey = today.toISOString().slice(0, 10);
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
+    // First day of current month
+    const firstDay = new Date(year, month, 1);
+    // Day-of-week of first day (0=Sun)
+    const startPad = firstDay.getDay();
+
+    // Last day of current month
+    const lastDay = new Date(year, month + 1, 0).getDate();
+
+    const days: { date: Date | null; active: boolean; shielded: boolean; isToday: boolean; isFuture: boolean }[] = [];
+
+    // Padding cells before day 1
+    for (let i = 0; i < startPad; i++) {
+        days.push({ date: null, active: false, shielded: false, isToday: false, isFuture: false });
     }
+
+    // Actual days
+    for (let d = 1; d <= lastDay; d++) {
+        const date = new Date(year, month, d);
+        const key = date.toISOString().slice(0, 10);
+        const isFuture = key > todayKey;
+        days.push({
+            date,
+            active: activeDates.has(key),
+            shielded: shieldDates.has(key),
+            isToday: key === todayKey,
+            isFuture,
+        });
+    }
+
     return days;
 }
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const MONTHS_PT: Record<number, string> = {
-    0: 'Jan', 1: 'Fev', 2: 'Mar', 3: 'Abr', 4: 'Mai', 5: 'Jun',
-    6: 'Jul', 7: 'Ago', 8: 'Set', 9: 'Out', 10: 'Nov', 11: 'Dez'
-};
+
 
 // ─── Streak milestones ────────────────────────────────────────────────────────
 const MILESTONES = [
@@ -39,33 +65,50 @@ export default function StreakPage() {
     const streak = profile?.streak ?? 0;
     const shields = profile?.shield_count ?? 0;  // shield_count is the correct field
     const [activeDates, setActiveDates] = useState<Set<string>>(new Set());
+    const [shieldDates, setShieldDates] = useState<Set<string>>(new Set());
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [bestStreak, setBestStreak] = useState(streak);
 
     useEffect(() => {
         if (!user?.id) return;
         const fetchHistory = async () => {
-            const { data } = await supabase
+            // Fetch active session days
+            const { data: sessionData } = await supabase
                 .from('daily_sessions')
-                .select('recalled_at')
+                .select('recalled_at, shield_used')
                 .eq('user_id', user.id)
-                .not('recalled_at', 'is', null)
                 .order('recalled_at', { ascending: false });
-            if (data) {
-                const dates = new Set(data.map(s => (s.recalled_at as string).slice(0, 10)));
-                setActiveDates(dates);
-                setBestStreak(Math.max(streak, dates.size));
+
+            if (sessionData) {
+                const active = new Set<string>();
+                const shielded = new Set<string>();
+                for (const s of sessionData) {
+                    if (s.recalled_at) {
+                        const key = (s.recalled_at as string).slice(0, 10);
+                        if ((s as any).shield_used) {
+                            shielded.add(key);
+                        } else {
+                            active.add(key);
+                        }
+                    }
+                }
+                setActiveDates(active);
+                setShieldDates(shielded);
+                setBestStreak(Math.max(streak, active.size + shielded.size));
             }
             setLoadingHistory(false);
         };
         fetchHistory();
     }, [user?.id, streak]);
 
-    const calendar = buildCalendar(activeDates);
+    const calendar = buildMonthCalendar(activeDates, shieldDates);
 
     // Group by week (rows of 7)
     const weeks: typeof calendar[] = [];
     for (let i = 0; i < calendar.length; i += 7) { weeks.push(calendar.slice(i, i + 7)); }
+
+    const currentMonthName = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+    const monthLabel = currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1);
 
     return (
         <div className="min-h-screen">
@@ -160,9 +203,15 @@ export default function StreakPage() {
 
                 {/* ── Calendar ── */}
                 <div className="panel p-5 mb-8" style={{ border: '1px solid var(--color-border-glow)' }}>
-                    <div className="flex items-center gap-2 mb-5">
-                        <Calendar size={18} style={{ color: 'var(--color-gold)' }} />
-                        <p className="font-black" style={{ color: 'var(--color-text)' }}>Histórico de 35 dias</p>
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2">
+                            <Calendar size={18} style={{ color: 'var(--color-gold)' }} />
+                            <p className="font-black" style={{ color: 'var(--color-text)' }}>Histórico de {monthLabel}</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] font-bold" style={{ color: 'var(--color-text-muted)' }}>
+                            <span className="flex items-center gap-1">🔥 Sessão</span>
+                            <span className="flex items-center gap-1"><img src={shieldImg} className="w-3 h-3 object-contain" alt="" /> Escudo</span>
+                        </div>
                     </div>
 
                     {/* Weekday headers */}
@@ -180,34 +229,51 @@ export default function StreakPage() {
                     ) : (
                         weeks.map((week, wi) => (
                             <div key={wi} className="grid grid-cols-7 gap-1.5 mb-1.5">
-                                {week.map(({ date, active, isToday }, di) => (
+                                {week.map(({ date, active, shielded, isToday, isFuture }, di) => (
                                     <motion.div key={di}
                                         initial={{ scale: 0.8, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
                                         transition={{ delay: (wi * 7 + di) * 0.01 }}
                                         className="aspect-square rounded-xl flex flex-col items-center justify-center"
                                         style={{
-                                            background: active
-                                                ? 'linear-gradient(135deg, #FF6B35 0%, #FF913A 100%)'
-                                                : isToday
-                                                    ? 'rgba(255,107,53,0.15)'
-                                                    : 'var(--color-glass)',
-                                            border: isToday
-                                                ? '1.5px solid rgba(255,107,53,0.6)'
+                                            background: !date
+                                                ? 'transparent'
                                                 : active
-                                                    ? 'none'
-                                                    : '1px solid var(--color-border)',
-                                            boxShadow: active ? '0 2px 12px rgba(255,107,53,0.4)' : 'none',
+                                                    ? 'linear-gradient(135deg, #FF6B35 0%, #FF913A 100%)'
+                                                    : shielded
+                                                        ? 'linear-gradient(135deg, rgba(129,140,248,0.5) 0%, rgba(99,102,241,0.6) 100%)'
+                                                        : isToday
+                                                            ? 'rgba(255,107,53,0.15)'
+                                                            : isFuture
+                                                                ? 'rgba(255,255,255,0.02)'
+                                                                : 'var(--color-glass)',
+                                            border: !date
+                                                ? 'none'
+                                                : isToday
+                                                    ? '1.5px solid rgba(255,107,53,0.6)'
+                                                    : active
+                                                        ? 'none'
+                                                        : shielded
+                                                            ? '1px solid rgba(129,140,248,0.4)'
+                                                            : isFuture
+                                                                ? '1px solid rgba(255,255,255,0.04)'
+                                                                : '1px solid var(--color-border)',
+                                            boxShadow: active
+                                                ? '0 2px 12px rgba(255,107,53,0.4)'
+                                                : shielded
+                                                    ? '0 2px 12px rgba(129,140,248,0.3)'
+                                                    : 'none',
+                                            opacity: isFuture ? 0.35 : 1,
                                         }}>
-                                        {active ? (
+                                        {!date ? null : active ? (
                                             <span style={{ fontSize: 16, filter: 'drop-shadow(0 0 4px rgba(255,107,53,0.8))' }}>🔥</span>
+                                        ) : shielded ? (
+                                            <img src={shieldImg} className="w-4 h-4 object-contain"
+                                                style={{ filter: 'drop-shadow(0 0 4px rgba(129,140,248,0.8))' }} alt="" />
                                         ) : (
                                             <div>
-                                                <p className="text-[9px] text-center font-bold" style={{ color: isToday ? 'var(--color-fire)' : 'var(--color-text-muted)' }}>
+                                                <p className="text-[9px] text-center font-bold" style={{ color: isToday ? 'var(--color-fire)' : isFuture ? 'var(--color-text-muted)' : 'var(--color-text-muted)' }}>
                                                     {date.getDate()}
-                                                </p>
-                                                <p className="text-[8px] text-center" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
-                                                    {MONTHS_PT[date.getMonth()]}
                                                 </p>
                                             </div>
                                         )}
