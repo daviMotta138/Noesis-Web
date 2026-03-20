@@ -42,6 +42,12 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
     const [chatError, setChatError] = useState<string | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
 
+    // Selection state
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [selectionMode, setSelectionMode] = useState(false);
+    const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [copyToast, setCopyToast] = useState(false);
+
     // Fetch messages
     useEffect(() => {
         let cancelled = false;
@@ -88,6 +94,11 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Clear selection when leaving selection mode
+    useEffect(() => {
+        if (!selectionMode) setSelectedIds(new Set());
+    }, [selectionMode]);
+
     const handleSend = async () => {
         const content = text.trim();
         if (!content) return;
@@ -110,7 +121,6 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
         }
     };
 
-
     const handleKey = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
     };
@@ -120,33 +130,125 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
         return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     };
 
+    // ── Long-press handlers ──────────────────────────────────────────────────
+    const startPress = (id: string) => {
+        pressTimer.current = setTimeout(() => {
+            setSelectionMode(true);
+            setSelectedIds(prev => { const n = new Set(prev); n.add(id); return n; });
+        }, 500);
+    };
+
+    const cancelPress = () => {
+        if (pressTimer.current) clearTimeout(pressTimer.current);
+    };
+
+    const toggleSelect = (id: string) => {
+        if (!selectionMode) return;
+        setSelectedIds(prev => {
+            const n = new Set(prev);
+            if (n.has(id)) { n.delete(id); if (n.size === 0) setSelectionMode(false); }
+            else n.add(id);
+            return n;
+        });
+    };
+
+    // ── Actions ────────────────────────────────────────────────────────────────
+    const handleCopy = () => {
+        const text = messages
+            .filter(m => selectedIds.has(m.id))
+            .map(m => m.content)
+            .join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            setCopyToast(true);
+            setTimeout(() => setCopyToast(false), 2000);
+        });
+        setSelectionMode(false);
+    };
+
+    const handleForward = () => {
+        const quoted = messages
+            .filter(m => selectedIds.has(m.id))
+            .map(m => `> ${m.content}`)
+            .join('\n');
+        setText(quoted + '\n');
+        setSelectionMode(false);
+    };
+
+    const selectedCount = selectedIds.size;
+
     return (
         <div className="flex flex-col h-full">
-            {/* Chat header */}
-            <div className="flex items-center gap-3 p-5 flex-shrink-0"
-                style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <button onClick={onBack} className="p-1 rounded-lg transition-all"
-                    style={{ color: 'var(--color-text-muted)' }}>
-                    <ChevronLeft size={20} />
-                </button>
-                <FlippableProfilePic
-                    avatarUrl={friend.avatar_url}
-                    avatarConfig={friend.avatar_config}
-                    fallbackAvatar={friend.display_name.charAt(0).toUpperCase()}
-                    size={36}
-                    autoFlip={false}
-                    className="rounded-xl overflow-hidden shadow-md flex-shrink-0"
-                />
-                <div>
-                    <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>{friend.display_name}</p>
-                    <p className="text-xs flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
-                        🔥 {friend.streak} · <img src={coinImg} className="w-3 h-3 object-contain" alt="" /> {friend.nous_coins}
-                    </p>
-                </div>
-            </div>
+            {/* Chat header / selection bar */}
+            <AnimatePresence mode="wait">
+                {selectionMode ? (
+                    <motion.div
+                        key="sel-header"
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="flex items-center gap-3 p-4 flex-shrink-0"
+                        style={{ borderBottom: '1px solid var(--color-border)', background: 'rgba(212,168,83,0.07)' }}
+                    >
+                        <button
+                            onClick={() => setSelectionMode(false)}
+                            className="p-1 rounded-lg"
+                            style={{ color: 'var(--color-text-muted)' }}
+                        >
+                            <X size={20} />
+                        </button>
+                        <span className="flex-1 text-sm font-bold" style={{ color: 'var(--color-gold)' }}>
+                            {selectedCount} selecionada{selectedCount !== 1 ? 's' : ''}
+                        </span>
+                        <button
+                            onClick={handleForward}
+                            disabled={selectedCount === 0}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-40"
+                            style={{ background: 'var(--color-card)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+                        >
+                            ↩ Encaminhar
+                        </button>
+                        <button
+                            onClick={handleCopy}
+                            disabled={selectedCount === 0}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-40"
+                            style={{ background: 'linear-gradient(135deg, #C49333, #E8B84B)', color: '#0D0F1C' }}
+                        >
+                            Copiar
+                        </button>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="normal-header"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center gap-3 p-5 flex-shrink-0"
+                        style={{ borderBottom: '1px solid var(--color-border)' }}
+                    >
+                        <button onClick={onBack} className="p-1 rounded-lg transition-all"
+                            style={{ color: 'var(--color-text-muted)' }}>
+                            <ChevronLeft size={20} />
+                        </button>
+                        <FlippableProfilePic
+                            avatarUrl={friend.avatar_url}
+                            avatarConfig={friend.avatar_config}
+                            fallbackAvatar={friend.display_name.charAt(0).toUpperCase()}
+                            size={36}
+                            autoFlip={false}
+                            className="rounded-xl overflow-hidden shadow-md flex-shrink-0"
+                        />
+                        <div>
+                            <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>{friend.display_name}</p>
+                            <p className="text-xs flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+                                🔥 {friend.streak} · <img src={coinImg} className="w-3 h-3 object-contain" alt="" /> {friend.nous_coins}
+                            </p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
                         <p className="text-sm animate-pulse" style={{ color: 'var(--color-text-muted)' }}>Carregando...</p>
@@ -166,19 +268,38 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
                 ) : (
                     messages.map(msg => {
                         const isMine = msg.sender_id === myId;
+                        const isSelected = selectedIds.has(msg.id);
                         return (
-                            <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <div
+                                key={msg.id}
+                                className={`flex ${isMine ? 'justify-end' : 'justify-start'} transition-all`}
+                                onClick={() => toggleSelect(msg.id)}
+                                onMouseDown={() => startPress(msg.id)}
+                                onMouseUp={cancelPress}
+                                onMouseLeave={cancelPress}
+                                onTouchStart={() => startPress(msg.id)}
+                                onTouchEnd={cancelPress}
+                                onTouchCancel={cancelPress}
+                            >
                                 <div className="max-w-[72%] space-y-1">
-                                    <div className="px-4 py-2.5 rounded-2xl text-sm"
+                                    <div
+                                        className="px-4 py-2.5 rounded-2xl text-sm transition-all"
                                         style={{
-                                            background: isMine
-                                                ? 'linear-gradient(135deg, #C49333 0%, #E8B84B 100%)'
-                                                : 'var(--color-card)',
+                                            background: isSelected
+                                                ? 'rgba(212,168,83,0.35)'
+                                                : isMine
+                                                    ? 'linear-gradient(135deg, #C49333 0%, #E8B84B 100%)'
+                                                    : 'var(--color-card)',
                                             color: isMine ? '#0D0F1C' : 'var(--color-text)',
-                                            border: isMine ? 'none' : '1px solid var(--color-border)',
+                                            border: isSelected
+                                                ? '1.5px solid rgba(212,168,83,0.8)'
+                                                : isMine ? 'none' : '1px solid var(--color-border)',
                                             borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                                             fontWeight: isMine ? 600 : 400,
-                                        }}>
+                                            transform: isSelected ? 'scale(0.97)' : 'scale(1)',
+                                            cursor: selectionMode ? 'pointer' : 'default',
+                                        }}
+                                    >
                                         {msg.content}
                                     </div>
                                     <p className="text-[10px] px-1"
@@ -192,6 +313,21 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
                 )}
                 <div ref={bottomRef} />
             </div>
+
+            {/* Copy toast */}
+            <AnimatePresence>
+                {copyToast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-xs font-bold z-50"
+                        style={{ background: 'rgba(212,168,83,0.9)', color: '#0D0F1C' }}
+                    >
+                        Copiado!
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Input */}
             <div className="p-4 flex-shrink-0" style={{ borderTop: '1px solid var(--color-border)' }}>
@@ -220,7 +356,9 @@ function ChatPanel({ friend, myId, onBack }: { friend: FriendProfile; myId: stri
 }
 
 
+
 // ─── Friend Profile Modal ─────────────────────────────────────────────────────
+
 function FriendProfileView({ friend, onClose, onChat }: { friend: FriendProfile; onClose: () => void; onChat: () => void; }) {
     const [showFullBody, setShowFullBody] = useState(false);
 

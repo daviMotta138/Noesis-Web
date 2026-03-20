@@ -6,6 +6,20 @@
   <link rel="icon" type="image/png" href="/favicon.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>noesis</title>
+  <script>
+    // Block right-click context menu
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    // Block DevTools shortcuts
+    document.addEventListener('keydown', function(e) {
+      // F12
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C
+      if (e.ctrlKey && e.shiftKey && ['I','i','J','j','C','c'].includes(e.key)) { e.preventDefault(); return false; }
+      // Ctrl+U (view source)
+      if (e.ctrlKey && ['U','u'].includes(e.key)) { e.preventDefault(); return false; }
+    });
+  </script>
 </head>
 
 <body>
