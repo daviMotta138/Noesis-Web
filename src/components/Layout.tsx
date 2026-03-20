@@ -129,12 +129,65 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
             <GiftClaimOverlay />
             <MusicPlayerUI className="hidden md:block fixed bottom-6 right-6 z-[100]" />
 
-            {/* ── Sidebar (Desktop) ── */}
-            <aside id="tutorial-nav-desktop" className="hidden md:flex w-60 flex-shrink-0 flex-col h-screen sticky top-0"
-                style={{ background: 'var(--color-deep)', borderRight: '1px solid var(--color-border)' }}>
+            {/* ── Sidebar (Desktop) — Liquid Glass (water-transparent + edge refraction) ── */}
+            <aside id="tutorial-nav-desktop" className="hidden md:flex w-60 flex-shrink-0 flex-col h-screen sticky top-0 relative"
+                style={{
+                    /* Center is near-fully transparent — stars show through */
+                    background: 'rgba(255,255,255,0.012)',
+                    /* NO backdrop-filter on the main element — handled by layers below */
+                    isolation: 'isolate',
+                }}>
+
+                {/* Layer 1: CENTER — very light blur, almost invisible like water */}
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 0,
+                    backdropFilter: 'blur(3px)',
+                    WebkitBackdropFilter: 'blur(3px)',
+                    pointerEvents: 'none',
+                }} />
+
+                {/* Layer 2: EDGE REFRACTION — heavy blur masked to edges only (water-glass distortion) */}
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 1,
+                    backdropFilter: 'blur(28px) saturate(200%) brightness(1.06)',
+                    WebkitBackdropFilter: 'blur(28px) saturate(200%) brightness(1.06)',
+                    pointerEvents: 'none',
+                    /* Mask: show only at right edge + top + bottom edges (hide center) */
+                    maskImage: `linear-gradient(to left,
+                        black 0px, black 18px,
+                        transparent 44px, transparent calc(100% - 44px),
+                        black calc(100% - 44px)
+                    ), linear-gradient(to bottom,
+                        black 0px, black 12px,
+                        transparent 36px, transparent calc(100% - 36px),
+                        black calc(100% - 36px)
+                    )`,
+                    maskComposite: 'intersect',
+                    WebkitMaskComposite: 'destination-in',
+                    WebkitMaskImage: `linear-gradient(to left,
+                        black 0px, black 18px,
+                        transparent 44px, transparent calc(100% - 44px),
+                        black calc(100% - 44px)
+                    ), linear-gradient(to bottom,
+                        black 0px, black 12px,
+                        transparent 36px, transparent calc(100% - 36px),
+                        black calc(100% - 36px)
+                    )`,
+                }} />
+
+                {/* Layer 3: Specular glass border */}
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 2,
+                    borderRight: '1px solid rgba(255,255,255,0.18)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.20), inset -1px 0 0 rgba(255,255,255,0.10)',
+                    pointerEvents: 'none',
+                }} />
+
+                {/* All content above the layers */}
+                <div className="relative flex flex-col h-full" style={{ zIndex: 3 }}>
 
                 {/* Logo */}
-                <div className="px-6 pt-8 pb-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <div className="px-6 pt-8 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                     <div className="flex flex-col gap-2">
                         <img src={logoImg} className="h-10 w-auto object-contain self-start" alt="NOESIS" />
                         <p className="text-[9px] tracking-[0.3em] pl-1 font-bold" style={{ color: 'var(--color-gold-dim)' }}>PALÁCIO DA MEMÓRIA</p>
@@ -142,28 +195,35 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                 </div>
 
                 {/* Nav items */}
-                <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+                <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto relative">
                     {NAV.map(({ to, icon: Icon, label }) => (
                         <NavLink key={to} to={to} end={to === '/'}
                             className={({ isActive }) =>
-                                `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 group ${isActive ? 'active-nav' : ''}`
+                                `flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 group ${isActive ? 'active-nav' : ''}`
                             }
                             style={({ isActive }) => ({
-                                background: isActive ? 'rgba(212,168,83,0.1)' : 'transparent',
-                                color: isActive ? 'var(--color-gold)' : 'var(--color-text-muted)',
-                                border: isActive ? '1px solid rgba(212,168,83,0.2)' : '1px solid transparent',
+                                background: isActive
+                                    ? 'rgba(255,255,255,0.12)'
+                                    : 'transparent',
+                                color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.42)',
+                                border: isActive
+                                    ? '1px solid rgba(255,255,255,0.22)'
+                                    : '1px solid transparent',
+                                boxShadow: isActive
+                                    ? 'inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.25)'
+                                    : 'none',
                             })}>
                             {({ isActive }) => (
                                 <>
-                                    <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8}
-                                        style={{ filter: isActive ? 'drop-shadow(0 0 6px rgba(212,168,83,0.5))' : 'none', flexShrink: 0 }} />
+                                    <Icon size={18} strokeWidth={isActive ? 2.2 : 1.6}
+                                        style={{ filter: isActive ? 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' : 'none', flexShrink: 0 }} />
                                     {label}
                                     {label === 'Amigos' && unreadMessages && !isActive && (
                                         <div className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
                                     )}
                                     {isActive && (
                                         <div className="ml-auto w-1.5 h-1.5 rounded-full"
-                                            style={{ background: 'var(--color-gold)' }} />
+                                            style={{ background: 'rgba(255,255,255,0.8)', boxShadow: '0 0 6px rgba(255,255,255,0.6)' }} />
                                     )}
                                 </>
                             )}
@@ -173,18 +233,19 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                     {/* Notifications link */}
                     <NavLink to="/notifications"
                         className={({ isActive }) =>
-                            `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 ${isActive ? 'active-nav' : ''}`
+                            `flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${isActive ? 'active-nav' : ''}`
                         }
                         style={({ isActive }) => ({
-                            background: isActive ? 'rgba(212,168,83,0.1)' : 'transparent',
-                            color: isActive ? 'var(--color-gold)' : 'var(--color-text-muted)',
-                            border: isActive ? '1px solid rgba(212,168,83,0.2)' : '1px solid transparent',
+                            background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+                            color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.42)',
+                            border: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid transparent',
+                            boxShadow: isActive ? 'inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.25)' : 'none',
                         })}>
                         {({ isActive }) => (
                             <>
                                 <div className="relative flex-shrink-0">
-                                    <Bell size={18} strokeWidth={isActive ? 2.5 : 1.8}
-                                        style={{ filter: isActive ? 'drop-shadow(0 0 6px rgba(212,168,83,0.5))' : 'none' }} />
+                                    <Bell size={18} strokeWidth={isActive ? 2.2 : 1.6}
+                                        style={{ filter: isActive ? 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' : 'none' }} />
                                     {unreadCount > 0 && (
                                         <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black"
                                             style={{ background: 'var(--color-danger)', color: '#fff' }}>
@@ -195,7 +256,7 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                                 Alertas
                                 {isActive && (
                                     <div className="ml-auto w-1.5 h-1.5 rounded-full"
-                                        style={{ background: 'var(--color-gold)' }} />
+                                        style={{ background: 'rgba(255,255,255,0.8)', boxShadow: '0 0 6px rgba(255,255,255,0.6)' }} />
                                 )}
                             </>
                         )}
@@ -218,13 +279,13 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                 </div>
 
                 {/* User info + logout */}
-                <div className="px-3 pb-5" style={{ borderTop: '1px solid var(--color-border)' }}>
+                <div className="px-3 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                     <button onClick={() => navigate('/profile')}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl mt-3 transition-all cursor-pointer"
-                        style={{ background: 'var(--color-glass)', border: '1px solid var(--color-border)' }}>
+                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}>
                         {/* Avatar thumbnail */}
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 overflow-hidden"
-                            style={{ background: 'var(--color-card)' }}>
+                            style={{ background: 'rgba(255,255,255,0.1)' }}>
                             {(profile as any)?.avatar_url
                                 ? <img src={(profile as any).avatar_url} alt="" className="w-full h-full object-cover" />
                                 : <span>🧠</span>}
@@ -259,9 +320,11 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                         <LogOut size={13} /> Sair
                     </button>
                 </div>
+                </div>{/* /content wrapper */}
             </aside>
 
             {/* ── Main Content ── */}
+
             {isCanvas ? (
                 <main className="flex-1 w-full bg-transparent min-h-screen">
                     {children}
@@ -274,20 +337,36 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                 </main>
             )}
 
-            {/* ── Mobile Bottom Nav ── */}
+            {/* ── Mobile Bottom Nav — Liquid Glass ── */}
             <nav id="tutorial-nav" className="md:hidden fixed bottom-0 left-0 right-0 z-[60] flex items-center justify-around h-16 px-2 safe-area-pb"
-                style={{ background: 'var(--color-overlay-heavy)', borderTop: '1px solid var(--color-border)', backdropFilter: 'blur(10px)' }}>
+                style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    backdropFilter: 'blur(28px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+                    borderTop: '1px solid rgba(255,255,255,0.14)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 -8px 32px rgba(0,0,0,0.45)',
+                }}>
 
                 {/* Main bottom tabs */}
                 {bottomNavItems.map(({ to, icon: Icon, label }) => (
                     <NavLink key={to} to={to} end={to === '/'}
                         onClick={() => { setIsMobileMenuOpen(false); audio.play('nav'); }}
-                        className={({ isActive }) => `flex flex-col items-center justify-center w-14 h-full gap-1 transition-all ${isActive && !isMobileMenuOpen ? 'active-nav' : ''}`}
-                        style={({ isActive }) => ({ color: isActive && !isMobileMenuOpen ? 'var(--color-gold)' : 'var(--color-text-muted)' })}>
+                        className={({ isActive }) => `flex flex-col items-center justify-center w-14 h-full gap-1 transition-all relative ${isActive && !isMobileMenuOpen ? 'active-nav' : ''}`}
+                        style={({ isActive }) => ({ color: isActive && !isMobileMenuOpen ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.38)' })}>
                         {({ isActive }) => (
                             <>
-                                <Icon size={20} strokeWidth={isActive && !isMobileMenuOpen ? 2.5 : 1.8} style={{ filter: isActive && !isMobileMenuOpen ? 'drop-shadow(0 0 6px rgba(212,168,83,0.5))' : 'none' }} />
-                                <span className="text-[9px] font-bold">{label}</span>
+                                {isActive && !isMobileMenuOpen && (
+                                    <div style={{
+                                        position: 'absolute', inset: '6px 4px',
+                                        borderRadius: 14,
+                                        background: 'rgba(255,255,255,0.12)',
+                                        border: '1px solid rgba(255,255,255,0.22)',
+                                        boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.28), 0 4px 12px rgba(0,0,0,0.3)',
+                                    }} />
+                                )}
+                                <Icon size={20} strokeWidth={isActive && !isMobileMenuOpen ? 2.2 : 1.6}
+                                    style={{ filter: isActive && !isMobileMenuOpen ? 'drop-shadow(0 0 8px rgba(255,255,255,0.5))' : 'none', position: 'relative' }} />
+                                <span className="text-[9px] font-bold relative" style={{ fontWeight: isActive && !isMobileMenuOpen ? 700 : 500 }}>{label}</span>
                             </>
                         )}
                     </NavLink>
@@ -316,7 +395,14 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                     <motion.div
                         initial={{ opacity: 0, y: '100%' }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                         className="md:hidden fixed inset-x-0 bottom-16 z-[55] rounded-t-3xl overflow-hidden pb-4"
-                        style={{ background: 'var(--color-overlay-heavy)', borderTop: '1px solid var(--color-border-glow)', backdropFilter: 'blur(20px)', boxShadow: '0 -10px 40px rgba(0,0,0,0.5)' }}>
+                        style={{
+                            /* Dark semi-opaque background for contrast + blur for glass feel */
+                            background: 'rgba(5,6,20,0.82)',
+                            backdropFilter: 'blur(40px) saturate(160%)',
+                            WebkitBackdropFilter: 'blur(40px) saturate(160%)',
+                            borderTop: '1px solid rgba(255,255,255,0.14)',
+                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 -16px 48px rgba(0,0,0,0.7)',
+                        }}>
                         <div className="p-5 max-h-[70vh] overflow-y-auto">
                             <div className="w-12 h-1.5 bg-gray-600 rounded-full mx-auto mb-6 opacity-30" />
 
