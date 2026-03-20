@@ -272,17 +272,23 @@ export const useGameStore = create<GameState>()(
 
             loadActiveSession: async (userId: string) => {
                 // Find today's session that hasn't been recalled yet
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('daily_sessions')
-                    .select('*')
+                    .select('id, created_at, user_id, words, unlocks_at, recalled_at, viewed_at, answers, score, success, nous_reward')
                     .eq('user_id', userId)
                     .is('recalled_at', null)
                     .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                    .limit(1);
 
-                if (data) {
-                    const session = data as DailySession;
+                if (error) {
+                    console.error('Error loading active session:', error);
+                    return;
+                }
+
+                const singleData = Array.isArray(data) ? data[0] : data;
+
+                if (singleData) {
+                    const session = singleData as DailySession;
                     const unlockMs = new Date(session.unlocks_at).getTime();
                     const now = Date.now();
                     set({

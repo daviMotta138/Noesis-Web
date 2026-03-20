@@ -1,9 +1,10 @@
-// src/lib/notifications.ts
 import { useGameStore } from '../store/useGameStore';
 import { audio } from './audio';
+import { Capacitor } from '@capacitor/core';
 
 // Dynamically import Capacitor plugins only in native context
 async function getLocalNotifications() {
+    if (Capacitor.getPlatform() === 'web') return null;
     try {
         const { LocalNotifications } = await import('@capacitor/local-notifications');
         return LocalNotifications;
@@ -13,6 +14,7 @@ async function getLocalNotifications() {
 }
 
 async function getCapacitorPush() {
+    if (Capacitor.getPlatform() === 'web') return null;
     try {
         const { PushNotifications } = await import('@capacitor/push-notifications');
         return PushNotifications;

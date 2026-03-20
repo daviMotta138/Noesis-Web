@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Star, Zap, Crown } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import coinImg from '../assets/coin.webp';
+import { MercadoPagoCheckout } from '../components/MercadoPagoCheckout';
 
 // ─── Packages ─────────────────────────────────────────────────────────────────
 const PACKS = [
@@ -93,18 +94,37 @@ function CoinStack({ count, accent }: { count: number; accent: string }) {
 
 export default function NousStorePage() {
     const navigate = useNavigate();
-    const { profile, updateProfile } = useGameStore();
-    const [buying, setBuying] = useState<string | null>(null);
+    const { profile } = useGameStore();
     const [success, setSuccess] = useState<string | null>(null);
+    const [checkoutPack, setCheckoutPack] = useState<any>(null);
+
+    useState(() => {
+        // Check for payment status in URL
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get('payment');
+        if (status === 'success') {
+            setSuccess('Pagamento aprovado! Seus Nous serão creditados em instantes.');
+            // Clear URL params
+            window.history.replaceState({}, '', window.location.pathname);
+            setTimeout(() => setSuccess(null), 5000);
+        } else if (status === 'failure') {
+            alert('O pagamento não foi concluído. Tente novamente.');
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    });
 
     const handleBuy = async (pack: typeof PACKS[0]) => {
-        setBuying(pack.id); setSuccess(null);
-        // Simulate purchase (real implementation would use Stripe / payment gateway)
-        await new Promise(r => setTimeout(r, 1200));
-        await updateProfile({ nous_coins: (profile?.nous_coins ?? 0) + pack.nous + pack.bonus });
-        setBuying(null);
-        setSuccess(`+${pack.nous + pack.bonus} Nous adicionados!`);
-        setTimeout(() => setSuccess(null), 3000);
+        if (!profile?.id) {
+            alert('Você precisa estar logado para comprar Nous.');
+            return;
+        }
+        setCheckoutPack(pack);
+    };
+
+    const handlePaymentSuccess = () => {
+        setCheckoutPack(null);
+        setSuccess('Pagamento aprovado! Seus Nous foram creditados.');
+        setTimeout(() => setSuccess(null), 5000);
     };
 
     return (
@@ -238,16 +258,15 @@ export default function NousStorePage() {
                                     </p>
 
                                     {/* Buy button */}
-                                    <button onClick={() => handleBuy(pack)} disabled={buying === pack.id}
+                                    <button onClick={() => handleBuy(pack)}
                                         className="w-full py-3 rounded-xl text-sm font-black transition-all"
                                         style={{
                                             background: `linear-gradient(135deg, ${pack.accent}CC, ${pack.accent})`,
                                             color: '#0D0F1C',
                                             boxShadow: `0 4px 16px ${pack.accentGlow}`,
-                                            opacity: buying === pack.id ? 0.6 : 1,
                                             letterSpacing: '0.08em',
                                         }}>
-                                        {buying === pack.id ? '⌛ Aguarde...' : 'COMPRAR'}
+                                        COMPRAR
                                     </button>
                                 </div>
                             </motion.div>
@@ -261,6 +280,18 @@ export default function NousStorePage() {
                     Todos os valores em BRL já incluem impostos aplicáveis.
                 </p>
             </div>
+
+            <AnimatePresence>
+                {checkoutPack && (
+                    <MercadoPagoCheckout 
+                        pack={checkoutPack}
+                        userId={profile?.id || ''}
+                        userEmail={profile?.email || ''}
+                        onClose={() => setCheckoutPack(null)}
+                        onSuccess={handlePaymentSuccess}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }
