@@ -91,12 +91,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.log('[webhook] Creditando', nousEarned, 'Nous para usuário', creditUserId, isGift ? '(presente de ' + userId + ')' : '')
 
-    // 4. Buscar saldo atual do destinatário
-    const profileRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${creditUserId}&select=nous_coins,display_name&limit=1`,
-      { headers: dbHeaders }
-    )
+    // 4. Buscar saldo atual do destinatário (e nome do comprador se for presente)
+    const [profileRes, senderRes] = await Promise.all([
+      fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${creditUserId}&select=nous_coins,display_name&limit=1`,
+        { headers: dbHeaders }
+      ),
+      isGift
+        ? fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=display_name&limit=1`, { headers: dbHeaders })
+        : Promise.resolve(null),
+    ])
     const profiles = await profileRes.json()
+    const senderName: string = isGift && senderRes
+      ? ((await senderRes.json())?.[0]?.display_name || 'Alguém')
+      : ''
 
     if (!profiles || profiles.length === 0) {
       console.error('[webhook] Perfil não encontrado para credit_user_id:', creditUserId)
@@ -135,7 +143,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // 7. Notificações
     if (isGift) {
-      // Notificar o destinatário do presente
+      // Notificar o destinatário do presente (com metadata para o GiftClaimOverlay)
       await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
         method: 'POST',
         headers: { ...dbHeaders, Prefer: 'return=minimal' },
@@ -143,7 +151,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
           user_id: creditUserId,
           type: 'gift_received',
           title: 'Você recebeu um presente! 🎁',
-          body: `${nousEarned} Nous foram adicionados à sua conta por um amigo!`,
+          body: `${senderName} te enviou ${nousEarned} Nous!`,
+          claimed: false,
+          metadata: {
+            category: 'nous',            // GiftClaimOverlay detecta por este campo
+            nous_amount: nousEarned,
+            sender_name: senderName,
+            name: `${nousEarned} Nous`,  // exibido como título do reveal
+            emoji: '🪙',
+          },
         }),
       })
       // Notificar o comprador

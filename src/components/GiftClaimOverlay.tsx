@@ -7,6 +7,7 @@ import { useGameStore } from '../store/useGameStore';
 import { audio } from '../lib/audio';
 import shieldImg from '../assets/shield.png';
 import giftImg from '../assets/gift.png';
+import coinImg from '../assets/coin.webp';
 
 // Categories that can be equipped in the Avatar screen
 const EQUIPPABLE_CATEGORIES = [
@@ -35,6 +36,105 @@ function Particle({ delay, x, y }: { delay: number; x: number; y: number }) {
                 left: '50%',
             }}
         />
+    );
+}
+
+// ─── Phase 2b: Nous Reveal ─────────────────────────────────────────────
+function NousRevealView({
+    nousAmount,
+    senderName,
+    claiming,
+    claimed,
+    onClaim,
+}: {
+    nousAmount: number;
+    senderName: string;
+    claiming: boolean;
+    claimed: boolean;
+    onClaim: () => void;
+}) {
+    return (
+        <motion.div
+            key="nous-reveal"
+            initial={{ opacity: 0, scale: 0.75 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 240 }}
+            className="flex flex-col items-center text-center"
+        >
+            {/* Coin showcase */}
+            <div className="relative mb-6 flex items-center justify-center">
+                {/* Burst particles */}
+                {PARTICLE_DATA.map((p, i) => (
+                    <Particle key={i} delay={p.delay} x={p.x} y={p.y} />
+                ))}
+                <motion.div
+                    initial={{ scale: 0, rotate: -12 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: 'spring', damping: 16, stiffness: 220, delay: 0.08 }}
+                    className="relative w-44 h-44 rounded-3xl flex items-center justify-center overflow-hidden"
+                    style={{
+                        background: 'linear-gradient(145deg, rgba(212,168,83,0.25), rgba(20,15,35,0.9))',
+                        border: '2px solid rgba(212,168,83,0.6)',
+                        boxShadow: '0 0 60px rgba(212,168,83,0.35)',
+                    }}
+                >
+                    <img src={coinImg} className="w-28 h-28 object-contain" alt="Nous" />
+                </motion.div>
+            </div>
+
+            {/* Info */}
+            <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-8 space-y-1"
+            >
+                <p className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: 'var(--color-gold-dim)' }}>
+                    Nous de Conhecimento
+                </p>
+                <h2 className="text-5xl font-black text-display text-gradient-gold tracking-tight leading-none">
+                    +{nousAmount.toLocaleString()}
+                </h2>
+                {senderName && (
+                    <p className="text-sm mt-2" style={{ color: 'var(--color-text-sub)' }}>
+                        Enviado por <b>{senderName}</b>
+                    </p>
+                )}
+            </motion.div>
+
+            {/* Action */}
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28 }}
+                className="w-full"
+            >
+                {claimed ? (
+                    <motion.div
+                        initial={{ scale: 0 }} animate={{ scale: 1 }}
+                        className="flex flex-col items-center gap-2"
+                        style={{ color: 'var(--color-gold)' }}
+                    >
+                        <CheckCircle2 size={52} />
+                        <span className="font-black text-sm uppercase tracking-widest">Nous recebidos!</span>
+                    </motion.div>
+                ) : (
+                    <button
+                        onClick={onClaim}
+                        disabled={claiming}
+                        className="w-full h-14 rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                        style={{
+                            background: 'linear-gradient(135deg, #C49333, #E8B84B)',
+                            color: '#110800',
+                            boxShadow: '0 0 20px rgba(212,168,83,0.35)',
+                        }}
+                    >
+                        {claiming ? <Loader2 className="animate-spin" size={20} /> : 'RECEBER'}
+                    </button>
+                )}
+            </motion.div>
+        </motion.div>
     );
 }
 
@@ -389,6 +489,14 @@ export const GiftClaimOverlay = () => {
                                 <GiftClosedView
                                     senderName={metadata.sender_name || 'Alguém'}
                                     onOpen={handleOpen}
+                                />
+                            ) : metadata.category === 'nous' ? (
+                                <NousRevealView
+                                    nousAmount={metadata.nous_amount || 0}
+                                    senderName={metadata.sender_name || ''}
+                                    claiming={claiming}
+                                    claimed={claimed}
+                                    onClaim={markClaimed}
                                 />
                             ) : (
                                 <GiftRevealView
