@@ -47,7 +47,7 @@ export const StarBackground = ({ interactive = false }: { interactive?: boolean 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const starsRef = useRef<Star[]>([]);
     const shootingStarsRef = useRef<ShootingStar[]>([]);
-    const animationFrameRef = useRef<number>();
+    const animationFrameRef = useRef<number | null>(null);
     const mouseRef = useRef<Mouse>({ x: -9999, y: -9999, active: false });
     const [isWarping, setIsWarping] = useState(false);
 
