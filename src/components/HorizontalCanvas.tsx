@@ -4,7 +4,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-export const CANVAS_ROUTES = ['/', '/ranking', '/profile'] as const;
+export const CANVAS_ROUTES = ['/', '/ranking', '/profile', '/avatar'] as const;
 export type CanvasRoute = typeof CANVAS_ROUTES[number];
 
 const DIRECTION_THRESHOLD = 12; // px before direction lock

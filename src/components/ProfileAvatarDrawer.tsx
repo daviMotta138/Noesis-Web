@@ -24,7 +24,7 @@ export function ProfileAvatarDrawer({ avatarConfig, onHoverChange }: ProfileAvat
 
     return (
         <motion.div
-            className="fixed top-0 right-0 h-full z-50 flex items-center cursor-pointer pointer-events-auto"
+            className="hidden md:flex fixed top-0 right-0 h-full z-50 items-center cursor-pointer pointer-events-auto"
             // Mobile tap handling vs Desktop hover
             onHoverStart={handleHoverStart}
             onHoverEnd={handleHoverEnd}

@@ -13,6 +13,7 @@ import { GiftClaimOverlay } from './GiftClaimOverlay';
 import { MusicPlayerUI } from './MusicPlayer';
 import coinImg from '../assets/coin.webp';
 import shieldImg from '../assets/shield.png';
+import { Sparkles } from 'lucide-react';
 
 const BASE_NAV = [
     { to: '/', icon: Home, label: 'Início', adminOnly: false },
@@ -20,6 +21,7 @@ const BASE_NAV = [
     { to: '/friends', icon: Users, label: 'Amigos', adminOnly: false },
     { to: '/shop', icon: ShoppingBag, label: 'Loja', adminOnly: false },
     { to: '/profile', icon: User, label: 'Perfil', adminOnly: false },
+    { to: '/avatar', icon: Sparkles, label: 'Avatar', adminOnly: false },
     { to: '/settings', icon: Settings, label: 'Ajustes', adminOnly: false },
     { to: '/admin', icon: ShieldAlert, label: 'Admin', adminOnly: true },
 ];
@@ -129,65 +131,32 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
             <GiftClaimOverlay />
             <MusicPlayerUI className="hidden md:block fixed bottom-6 right-6 z-[100]" />
 
-            {/* ── Sidebar (Desktop) — Liquid Glass (water-transparent + edge refraction) ── */}
-            <aside id="tutorial-nav-desktop" className="hidden md:flex w-60 flex-shrink-0 flex-col h-screen sticky top-0 relative"
+            {/* ── Sidebar (Desktop) — Liquid Glass ── */}
+            {/* CSS backdrop-filter natively composites over WebGL canvas — no lib needed */}
+            <aside
+                id="tutorial-nav-desktop"
+                className="hidden md:flex w-60 flex-shrink-0 flex-col h-screen sticky top-0"
                 style={{
-                    /* Center is near-fully transparent — stars show through */
-                    background: 'rgba(255,255,255,0.012)',
-                    /* NO backdrop-filter on the main element — handled by layers below */
-                    isolation: 'isolate',
+                    background: 'rgba(255,255,255,0.04)',
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                    borderRight: '1px solid rgba(255,255,255,0.13)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), inset -1px 0 0 rgba(255,255,255,0.08)',
+                    position: 'relative',
+                    zIndex: 40,
                 }}>
 
-                {/* Layer 1: CENTER — very light blur, almost invisible like water */}
+                {/* Specular top shine — pointer-events:none so it never blocks clicks */}
                 <div style={{
-                    position: 'absolute', inset: 0, zIndex: 0,
-                    backdropFilter: 'blur(3px)',
-                    WebkitBackdropFilter: 'blur(3px)',
+                    position: 'absolute', top: 0, left: 0, right: 0,
+                    height: 80,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 100%)',
                     pointerEvents: 'none',
+                    zIndex: 0,
                 }} />
-
-                {/* Layer 2: EDGE REFRACTION — heavy blur masked to edges only (water-glass distortion) */}
-                <div style={{
-                    position: 'absolute', inset: 0, zIndex: 1,
-                    backdropFilter: 'blur(28px) saturate(200%) brightness(1.06)',
-                    WebkitBackdropFilter: 'blur(28px) saturate(200%) brightness(1.06)',
-                    pointerEvents: 'none',
-                    /* Mask: show only at right edge + top + bottom edges (hide center) */
-                    maskImage: `linear-gradient(to left,
-                        black 0px, black 18px,
-                        transparent 44px, transparent calc(100% - 44px),
-                        black calc(100% - 44px)
-                    ), linear-gradient(to bottom,
-                        black 0px, black 12px,
-                        transparent 36px, transparent calc(100% - 36px),
-                        black calc(100% - 36px)
-                    )`,
-                    maskComposite: 'intersect',
-                    WebkitMaskComposite: 'destination-in',
-                    WebkitMaskImage: `linear-gradient(to left,
-                        black 0px, black 18px,
-                        transparent 44px, transparent calc(100% - 44px),
-                        black calc(100% - 44px)
-                    ), linear-gradient(to bottom,
-                        black 0px, black 12px,
-                        transparent 36px, transparent calc(100% - 36px),
-                        black calc(100% - 36px)
-                    )`,
-                }} />
-
-                {/* Layer 3: Specular glass border */}
-                <div style={{
-                    position: 'absolute', inset: 0, zIndex: 2,
-                    borderRight: '1px solid rgba(255,255,255,0.18)',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.20), inset -1px 0 0 rgba(255,255,255,0.10)',
-                    pointerEvents: 'none',
-                }} />
-
-                {/* All content above the layers */}
-                <div className="relative flex flex-col h-full" style={{ zIndex: 3 }}>
 
                 {/* Logo */}
-                <div className="px-6 pt-8 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="relative z-10 px-6 pt-8 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                     <div className="flex flex-col gap-2">
                         <img src={logoImg} className="h-10 w-auto object-contain self-start" alt="NOESIS" />
                         <p className="text-[9px] tracking-[0.3em] pl-1 font-bold" style={{ color: 'var(--color-gold-dim)' }}>PALÁCIO DA MEMÓRIA</p>
@@ -195,23 +164,17 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                 </div>
 
                 {/* Nav items */}
-                <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto relative">
+                <nav className="relative z-10 flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
                     {NAV.map(({ to, icon: Icon, label }) => (
                         <NavLink key={to} to={to} end={to === '/'}
                             className={({ isActive }) =>
-                                `flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 group ${isActive ? 'active-nav' : ''}`
+                                `flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${isActive ? 'active-nav' : ''}`
                             }
                             style={({ isActive }) => ({
-                                background: isActive
-                                    ? 'rgba(255,255,255,0.12)'
-                                    : 'transparent',
-                                color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.42)',
-                                border: isActive
-                                    ? '1px solid rgba(255,255,255,0.22)'
-                                    : '1px solid transparent',
-                                boxShadow: isActive
-                                    ? 'inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.25)'
-                                    : 'none',
+                                background: isActive ? 'rgba(255,255,255,0.11)' : 'transparent',
+                                color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+                                border: isActive ? '1px solid rgba(255,255,255,0.20)' : '1px solid transparent',
+                                boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 12px rgba(0,0,0,0.2)' : 'none',
                             })}>
                             {({ isActive }) => (
                                 <>
@@ -236,10 +199,10 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                             `flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${isActive ? 'active-nav' : ''}`
                         }
                         style={({ isActive }) => ({
-                            background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                            color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.42)',
-                            border: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid transparent',
-                            boxShadow: isActive ? 'inset 0 1.5px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.25)' : 'none',
+                            background: isActive ? 'rgba(255,255,255,0.11)' : 'transparent',
+                            color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+                            border: isActive ? '1px solid rgba(255,255,255,0.20)' : '1px solid transparent',
+                            boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 12px rgba(0,0,0,0.2)' : 'none',
                         })}>
                         {({ isActive }) => (
                             <>
@@ -264,7 +227,7 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                 </nav>
 
                 {/* Playground Link */}
-                <div className="px-5 mt-auto mb-4">
+                <div className="relative z-10 px-5 mt-auto mb-4">
                     <button onClick={() => navigate('/playground')}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-black transition-all hover:scale-[1.02] active:scale-95 group"
                         style={{
@@ -279,11 +242,10 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                 </div>
 
                 {/* User info + logout */}
-                <div className="px-3 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="relative z-10 px-3 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                     <button onClick={() => navigate('/profile')}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl mt-3 transition-all cursor-pointer"
                         style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                        {/* Avatar thumbnail */}
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 overflow-hidden"
                             style={{ background: 'rgba(255,255,255,0.1)' }}>
                             {(profile as any)?.avatar_url
@@ -320,7 +282,6 @@ export default function Layout({ isCanvas = false, children }: { isCanvas?: bool
                         <LogOut size={13} /> Sair
                     </button>
                 </div>
-                </div>{/* /content wrapper */}
             </aside>
 
             {/* ── Main Content ── */}

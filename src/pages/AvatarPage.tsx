@@ -285,11 +285,11 @@ export default function AvatarPage() {
     };
 
     return (
-        <div className="fixed inset-0 z-[999] bg-[#0A0A10] flex flex-col md:flex-row overflow-hidden text-white font-body">
+        <div className="md:fixed md:inset-0 md:z-[999] relative w-full min-h-[100dvh] bg-[#0A0A10] flex flex-col md:flex-row overflow-hidden text-white font-body">
             {/* ── Top Header (Mobile & Desktop) ── */}
             <div className="absolute top-0 inset-x-0 h-20 bg-gradient-to-b from-black/80 to-transparent z-50 flex items-center justify-between px-6 pointer-events-none">
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={() => navigate('/profile')}
                     className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90 pointer-events-auto"
                     style={{ background: 'var(--color-glass-strong)', border: '1px solid var(--color-border)' }}>
                     <ChevronLeft size={20} />
@@ -313,8 +313,8 @@ export default function AvatarPage() {
             <div className="flex-1 relative flex items-center justify-center pt-8 pb-32 md:pt-0 md:pb-0 overflow-hidden pointer-events-none">
                 <motion.div layoutId="hero-avatar" className="h-[90%] md:h-[80%] max-h-[800px] w-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.5)]">
                     <Avatar2D config={draft} mode="full" className="w-auto transform-gpu relative z-10" style={{
-                        height: `233%`,
-                        transform: `translateY(0vh)`
+                        height: '319%',
+                        transform: 'translate(0vw, 0vh)'
                     }} />
 
                     {/* Blue Firefly Particle Transition */}
@@ -348,7 +348,7 @@ export default function AvatarPage() {
                 </motion.div>
 
                 {/* Floor shadow */}
-                <div className="absolute bottom-[20%] md:bottom-[10%] left-1/2 -translate-x-1/2 w-48 h-6 rounded-[100%] blur-[12px] opacity-80"
+                <div className="absolute bottom-[5.5%] md:bottom-[10%] left-1/2 -translate-x-1/2 w-48 h-6 rounded-[100%] blur-[12px] opacity-80"
                     style={{ background: 'radial-gradient(ellipse, #A855F7 0%, transparent 70%)' }} />
             </div>
 
@@ -424,7 +424,7 @@ export default function AvatarPage() {
                     </div>
 
                     {/* Content Area (Scrollable grid based on active tab) */}
-                    <div id="tutorial-avatar-items" className="flex-1 overflow-y-auto px-5 pb-32">
+                    <div id="tutorial-avatar-items" className="flex-1 overflow-y-auto px-5 pb-[130px] md:pb-32">
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={activeTab}
@@ -539,7 +539,7 @@ export default function AvatarPage() {
                 </div>
 
                 {/* Footer Save Button sticky at bottom */}
-                <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/90 to-transparent flex gap-3">
+                <div className="absolute inset-x-0 bottom-0 p-5 pb-24 md:pb-5 bg-gradient-to-t from-black via-black/90 to-transparent flex gap-3">
 
                     {showVariationsFor && (
                         <div className="flex-1 overflow-x-auto flex gap-2 items-center p-2 bg-white/5 rounded-2xl border border-white/10" style={{ scrollbarWidth: 'none' }}>

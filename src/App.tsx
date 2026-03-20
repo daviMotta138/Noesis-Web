@@ -55,6 +55,7 @@ function AnimatedRoutes() {
           <div className="min-h-[100dvh] pb-20 overflow-y-auto"><HomePage /></div>
           <div className="min-h-[100dvh] pb-20 overflow-y-auto"><RankingPage /></div>
           <div className="min-h-[100dvh] pb-20 overflow-y-auto"><ProfilePage /></div>
+          <div className="h-[100dvh] w-full flex overflow-hidden"><AvatarPage /></div>
         </HorizontalCanvas>
       </Layout>
     );
@@ -140,7 +141,7 @@ export default function App() {
       )}
 
       {/* ── App content — renders behind splash until splashDone ── */}
-      <div className="relative z-10 w-full min-h-screen">
+      <div className="relative w-full min-h-screen animate-fade-in-slow">
         {splashDone && (
           <AnimatePresence mode="wait">
             {!user ? (
@@ -148,12 +149,10 @@ export default function App() {
                 <AuthPage />
               </motion.div>
             ) : (
-              <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-                <HashRouter>
-                  <ChangelogModal />
-                  <AnimatedRoutes />
-                </HashRouter>
-              </motion.div>
+              <HashRouter>
+                <ChangelogModal />
+                <AnimatedRoutes />
+              </HashRouter>
             )}
           </AnimatePresence>
         )}
